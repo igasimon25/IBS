@@ -1086,22 +1086,49 @@ if not df_manfee.empty:
     components.html(full_html_mf, height=480, scrolling=True)
 
 # ==========================================
-# 13. STATUS REJECTION SAP SUMMARY
+# 13. STATUS REJECTION SAP SUMMARY (WITH PIC SITE FILTER)
 # ==========================================
 st.markdown("---")
 st.subheader("❌ Status Rejection SAP")
 
+# Deteksi Kolom Area dan PIC Site secara dinamis
+col_area_candidates = ['Area (Khusus SAP)', 'Area', 'Region']
+col_pic_candidates = ['PIC Site (Khusus SAP)', 'PIC Site', 'PIC']
+
+col_area = next((c for c in col_area_candidates if c in df_filtered.columns), None)
+col_pic = next((c for c in col_pic_candidates if c in df_filtered.columns), None)
+
+df_rej_filtered = df_filtered.copy()
+
+# Subheader Filter Khusus Rejection SAP (Area & PIC Site)
+if col_area or col_pic:
+    st.markdown("**Filter Rejection SAP**")
+    f_col1, f_col2 = st.columns(2)
+    
+    with f_col1:
+        if col_area:
+            unique_areas = sorted(df_filtered[col_area].dropna().astype(str).unique())
+            selected_areas = st.multiselect("Area (Khusus SAP)", options=unique_areas, default=unique_areas, key="rej_area_filter")
+            if selected_areas:
+                df_rej_filtered = df_rej_filtered[df_rej_filtered[col_area].astype(str).isin(selected_areas)]
+                
+    with f_col2:
+        if col_pic:
+            unique_pics = sorted(df_filtered[col_pic].dropna().astype(str).unique())
+            selected_pics = st.multiselect("PIC Site (Khusus SAP)", options=unique_pics, default=unique_pics, key="rej_pic_filter")
+            if selected_pics:
+                df_rej_filtered = df_rej_filtered[df_rej_filtered[col_pic].astype(str).isin(selected_pics)]
+
 def generate_rejection_sap_summary(df):
     df_calc = df.copy()
 
-    # Validasi Kolom Utama
     col_reg = 'new regional' if 'new regional' in df_calc.columns else ('Regional' if 'Regional' in df_calc.columns else None)
     col_inv_type = 'IBS Invoice Type' if 'IBS Invoice Type' in df_calc.columns else ('Invoice Type' if 'Invoice Type' in df_calc.columns else None)
     col_inv_no = 'Invoice No' if 'Invoice No' in df_calc.columns else ('No Invoice' if 'No Invoice' in df_calc.columns else None)
     col_sap = 'StatusSAP' if 'StatusSAP' in df_calc.columns else ('Status SAP' if 'Status SAP' in df_calc.columns else None)
 
     if not col_reg or not col_inv_type or not col_sap:
-        return pd.DataFrame(), 0, 0.0
+        return pd.DataFrame(), None, None, 0, 0.0
 
     # Cleaning & Casting NET AMOUNT
     if 'NET AMOUNT' in df_calc.columns:
@@ -1120,7 +1147,7 @@ def generate_rejection_sap_summary(df):
     df_rejected = df_calc[sap_series == 'REJECTED'].copy()
 
     if df_rejected.empty:
-        return pd.DataFrame(), 0, 0.0
+        return pd.DataFrame(), col_reg, col_inv_type, 0, 0.0
 
     # Groupby berdasarkan new regional dan IBS Invoice Type
     summary = df_rejected.groupby([col_reg, col_inv_type], as_index=False, dropna=False).agg(
@@ -1128,7 +1155,6 @@ def generate_rejection_sap_summary(df):
         Sum_of_NET_AMOUNT=('NET AMOUNT', 'sum')
     )
 
-    # Urutkan berdasarkan regional dan invoice type
     summary = summary.sort_values(by=[col_reg, col_inv_type]).reset_index(drop=True)
 
     total_count = int(summary['Count_of_Invoice_No'].sum())
@@ -1136,10 +1162,10 @@ def generate_rejection_sap_summary(df):
 
     return summary, col_reg, col_inv_type, total_count, total_net
 
-df_reject_summary, col_reg_name, col_type_name, total_inv_count, total_net_amt = generate_rejection_sap_summary(df_filtered)
+df_reject_summary, col_reg_name, col_type_name, total_inv_count, total_net_amt = generate_rejection_sap_summary(df_rej_filtered)
 
-if not df_reject_summary.empty:
-    # Metrik Ringkasan di atas Tabel (Mirip Tampilan Gambar)
+if not df_reject_summary.empty and col_reg_name:
+    # Metrik Ringkasan di atas Tabel
     col_m1, col_m2 = st.columns(2)
     with col_m1:
         st.markdown(f"""
