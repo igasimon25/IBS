@@ -1123,7 +1123,7 @@ if not df_manfee.empty:
     </body>
     </html>
     """
-    components.html(full_html_mf, height=650, scrolling=True)
+    components.html(full_html_mf, height=1000, scrolling=True)
 
 # ==========================================
 # 13. STATUS REJECTION SAP SUMMARY (DROPDOWN MULTI-SELECT)
