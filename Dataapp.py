@@ -1251,3 +1251,200 @@ if not df_reject_summary.empty and col_reg_name:
     components.html(full_html_reject, height=400, scrolling=True)
 else:
     st.info("Tidak ada data dengan Status SAP 'Rejected' yang sesuai dengan pilihan filter saat ini.")
+
+
+# ==========================================
+# 14. STATUS TRACKING INVOICE BM
+# ==========================================
+st.markdown("---")
+st.subheader("📊 Status Tracking Invoice BM")
+
+# Filter Subheader Data Tracking (Area, Year, PIC Site - Dropdown Multi-select)
+st.markdown("🔍 **Filter Data Tracking**")
+col_f1, col_f2, col_f3 = st.columns(3)
+
+# Deteksi kolom secara dinamis
+col_area_tr = next((c for c in ['Area (Khusus SAP)', 'Area', 'Region'] if c in df_filtered.columns), None)
+col_year_tr = next((c for c in ['Year', 'Tahun', 'Payment Year'] if c in df_filtered.columns), None)
+col_pic_tr = next((c for c in ['PIC Site (Khusus SAP)', 'PIC Site', 'PIC'] if c in df_filtered.columns), None)
+col_reg_tr = next((c for c in ['new regional', 'Regional', 'Region'] if c in df_filtered.columns), None)
+col_supp_tr = next((c for c in ['Supplier Name', 'Supplier', 'Vendor'] if c in df_filtered.columns), None)
+col_site_tr = next((c for c in ['Site ID', 'Site_ID', 'SiteID'] if c in df_filtered.columns), None)
+col_month_tr = next((c for c in ['Month', 'Bulan', 'Payment Month'] if c in df_filtered.columns), None)
+
+df_tracking = df_filtered.copy()
+
+with col_f1:
+    if col_area_tr:
+        opts_area = sorted(df_filtered[col_area_tr].dropna().astype(str).unique())
+        sel_area = st.multiselect("Select Area", options=opts_area, default=opts_area, key="track_area_sel")
+        if sel_area:
+            df_tracking = df_tracking[df_tracking[col_area_tr].astype(str).isin(sel_area)]
+        else:
+            df_tracking = df_tracking.iloc[0:0]
+
+with col_f2:
+    if col_year_tr:
+        opts_year = sorted(df_filtered[col_year_tr].dropna().astype(str).unique())
+        sel_year = st.multiselect("Select Year", options=opts_year, default=opts_year, key="track_year_sel")
+        if sel_year:
+            df_tracking = df_tracking[df_tracking[col_year_tr].astype(str).isin(sel_year)]
+        else:
+            df_tracking = df_tracking.iloc[0:0]
+
+with col_f3:
+    if col_pic_tr:
+        opts_pic = sorted(df_filtered[col_pic_tr].dropna().astype(str).unique())
+        sel_pic = st.multiselect("Select PIC Site", options=opts_pic, default=opts_pic, key="track_pic_sel")
+        if sel_pic:
+            df_tracking = df_tracking[df_tracking[col_pic_tr].astype(str).isin(sel_pic)]
+        else:
+            df_tracking = df_tracking.iloc[0:0]
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+if not df_tracking.empty and col_reg_tr and col_supp_tr and col_site_tr and col_month_tr:
+    # Standarisasi Bulan (Jan - Dec)
+    month_mapping = {
+        '1': 'Jan', '01': 'Jan', 'january': 'Jan', 'jan': 'Jan',
+        '2': 'Feb', '02': 'Feb', 'february': 'Feb', 'feb': 'Feb',
+        '3': 'Mar', '03': 'Mar', 'march': 'Mar', 'mar': 'Mar',
+        '4': 'Apr', '04': 'Apr', 'april': 'Apr', 'apr': 'Apr',
+        '5': 'May', '05': 'May', 'may': 'May',
+        '6': 'Jun', '06': 'Jun', 'june': 'Jun', 'jun': 'Jun',
+        '7': 'Jul', '07': 'Jul', 'july': 'Jul', 'jul': 'Jul',
+        '8': 'Aug', '08': 'Aug', 'august': 'Aug', 'aug': 'Aug',
+        '9': 'Sep', '09': 'Sep', 'september': 'Sep', 'sep': 'Sep',
+        '10': 'Oct', 'october': 'Oct', 'oct': 'Oct',
+        '11': 'Nov', 'november': 'Nov', 'nov': 'Nov',
+        '12': 'Dec', 'december': 'Dec', 'dec': 'Dec'
+    }
+    
+    df_tracking['Clean_Month'] = df_tracking[col_month_tr].astype(str).str.lower().str.strip().map(month_mapping).fillna(df_tracking[col_month_tr].astype(str))
+    all_months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    # Pivot Table untuk Tracking Invoice (Rows: Regional, Supplier Name, Site ID | Columns: Month | Values: Count of Invoice No)
+    pivot_track = df_tracking.pivot_table(
+        index=[col_reg_tr, col_supp_tr, col_site_tr],
+        columns='Clean_Month',
+        values=col_site_tr, # Count
+        aggfunc='count',
+        fill_value=0
+    )
+
+    # Pastikan seluruh kolom bulan 1-12 ada
+    for m in all_months:
+        if m not in pivot_track.columns:
+            pivot_track[m] = 0
+            
+    pivot_track = pivot_track[all_months].reset_index()
+
+    # Kalkulasi Formulas
+    pivot_track['Grand Total'] = pivot_track[all_months].sum(axis=1)
+    # Progress (%) = Grand Total / 12 bulan (dikonversi ke persentase)
+    pivot_track['Progress'] = (pivot_track['Grand Total'] / 12.0) * 100
+    # Invoice NY Received = 12 bulan - Grand Total (jika negatif dibatasi 0)
+    pivot_track['Invoice NY Received'] = (12 - pivot_track['Grand Total']).apply(lambda x: max(0, x))
+
+    # Metrik Ringkasan Atas
+    total_sites = pivot_track[col_site_tr].nunique()
+    avg_progress = pivot_track['Progress'].mean()
+    total_ny_received = pivot_track['Invoice NY Received'].sum()
+
+    m_c1, m_c2, m_c3 = st.columns(3)
+    with m_c1:
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; border-radius: 5px;">
+            <p style="margin: 0; font-size: 11px; color: #6c757d; font-weight: bold;">Total Site</p>
+            <h3 style="margin: 0; color: #212529;">{total_sites:,} Sites</h3>
+        </div>
+        """, unsafe_allow_html=True)
+    with m_c2:
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; border-radius: 5px;">
+            <p style="margin: 0; font-size: 11px; color: #6c757d; font-weight: bold;">Rata-Rata Progress</p>
+            <h3 style="margin: 0; color: #212529;">{avg_progress:.1f}%</h3>
+        </div>
+        """, unsafe_allow_html=True)
+    with m_c3:
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; border-radius: 5px;">
+            <p style="margin: 0; font-size: 11px; color: #6c757d; font-weight: bold;">Total Invoice NY Received</p>
+            <h3 style="margin: 0; color: #212529;">{total_ny_received:,} Inv</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Chart Bar Visualisasi Progress Tracking
+    st.markdown("📊 **Visualisasi Progress Tracking (%)**")
+    chart_data = pivot_track.set_index(col_site_tr)['Grand Total']
+    st.bar_chart(chart_data)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Render Tabel Tracking Invoice HTML
+    rows_html_tr = ""
+    for idx, row in pivot_track.iterrows():
+        reg_val = row[col_reg_tr]
+        supp_val = row[col_supp_tr]
+        site_val = row[col_site_tr]
+        
+        months_td = "".join([f"<td style='border: 1px solid #d9d9d9; padding: 5px; text-align: center;'>{int(row[m])}</td>" for m in all_months])
+        gt_val = int(row['Grand Total'])
+        prog_val = row['Progress']
+        ny_recv = int(row['Invoice NY Received'])
+        
+        # Kondisi warna merah jika Invoice NY Received > 0 atau sesuai gambar
+        ny_bg = "background-color: #ffcccc; color: #900; font-weight: bold;" if ny_recv > 0 else ""
+        row_bg = "#ffffff" if idx % 2 == 0 else "#f9f9f9"
+
+        rows_html_tr += f"""
+        <tr style="background-color: {row_bg};">
+            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: left;">{reg_val}</td>
+            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: left;">{supp_val}</td>
+            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: center; font-weight: bold;">{site_val}</td>
+            {months_td}
+            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: center; font-weight: bold;">{gt_val}</td>
+            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: center;">{prog_val:.0f}%</td>
+            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: center; {ny_bg}">{ny_recv}</td>
+        </tr>
+        """
+
+    headers_month_th = "".join([f"<th style='border: 1px solid #b0b0b0; padding: 6px; background-color: #f2f2f2; font-size: 10px;'>{m}</th>" for m in all_months])
+
+    full_html_tr = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
+        th {{ border: 1px solid #b0b0b0; padding: 6px; text-align: center; background-color: #e6e6e6; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+    <div style="overflow-x: auto; max-height: 500px;">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 15%;">Regional</th>
+                    <th style="width: 20%;">Supplier Name</th>
+                    <th style="width: 10%;">Site ID</th>
+                    {headers_month_th}
+                    <th style="width: 7%;">Grand Total</th>
+                    <th style="width: 7%;">Progress</th>
+                    <th style="width: 9%;">Invoice NY Received</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html_tr}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_html_tr, height=450, scrolling=True)
+else:
+    st.info("Data untuk Status Tracking Invoice BM tidak ditemukan atau kolom pendukung belum lengkap.")
