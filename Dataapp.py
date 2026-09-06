@@ -1254,7 +1254,7 @@ else:
 
 
 # ==========================================
-# 14. STATUS TRACKING INVOICE BM
+# 14. STATUS TRACKING INVOICE BM (REVISED)
 # ==========================================
 st.markdown("---")
 st.subheader("📊 Status Tracking Invoice BM")
@@ -1263,7 +1263,7 @@ st.subheader("📊 Status Tracking Invoice BM")
 st.markdown("🔍 **Filter Data Tracking**")
 col_f1, col_f2, col_f3 = st.columns(3)
 
-# Deteksi kolom secara dinamis
+# Deteksi kolom secara dinamis berdasarkan dataset Anda
 col_area_tr = next((c for c in ['Area (Khusus SAP)', 'Area', 'Region'] if c in df_filtered.columns), None)
 col_year_tr = next((c for c in ['Year', 'Tahun', 'Payment Year'] if c in df_filtered.columns), None)
 col_pic_tr = next((c for c in ['PIC Site (Khusus SAP)', 'PIC Site', 'PIC'] if c in df_filtered.columns), None)
@@ -1277,7 +1277,7 @@ df_tracking = df_filtered.copy()
 with col_f1:
     if col_area_tr:
         opts_area = sorted(df_filtered[col_area_tr].dropna().astype(str).unique())
-        sel_area = st.multiselect("Select Area", options=opts_area, default=opts_area, key="track_area_sel")
+        sel_area = st.multiselect("Select Area", options=opts_area, default=opts_area, key="track_area_sel_rev")
         if sel_area:
             df_tracking = df_tracking[df_tracking[col_area_tr].astype(str).isin(sel_area)]
         else:
@@ -1286,7 +1286,7 @@ with col_f1:
 with col_f2:
     if col_year_tr:
         opts_year = sorted(df_filtered[col_year_tr].dropna().astype(str).unique())
-        sel_year = st.multiselect("Select Year", options=opts_year, default=opts_year, key="track_year_sel")
+        sel_year = st.multiselect("Select Year", options=opts_year, default=opts_year, key="track_year_sel_rev")
         if sel_year:
             df_tracking = df_tracking[df_tracking[col_year_tr].astype(str).isin(sel_year)]
         else:
@@ -1295,7 +1295,7 @@ with col_f2:
 with col_f3:
     if col_pic_tr:
         opts_pic = sorted(df_filtered[col_pic_tr].dropna().astype(str).unique())
-        sel_pic = st.multiselect("Select PIC Site", options=opts_pic, default=opts_pic, key="track_pic_sel")
+        sel_pic = st.multiselect("Select PIC Site", options=opts_pic, default=opts_pic, key="track_pic_sel_rev")
         if sel_pic:
             df_tracking = df_tracking[df_tracking[col_pic_tr].astype(str).isin(sel_pic)]
         else:
@@ -1323,30 +1323,33 @@ if not df_tracking.empty and col_reg_tr and col_supp_tr and col_site_tr and col_
     df_tracking['Clean_Month'] = df_tracking[col_month_tr].astype(str).str.lower().str.strip().map(month_mapping).fillna(df_tracking[col_month_tr].astype(str))
     all_months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-    # Pivot Table untuk Tracking Invoice (Rows: Regional, Supplier Name, Site ID | Columns: Month | Values: Count of Invoice No)
+    # Pivot Table untuk Tracking Invoice (Rows: new regional, Supplier Name, Site ID | Columns: Month | Values: Count of Invoice No)
     pivot_track = df_tracking.pivot_table(
         index=[col_reg_tr, col_supp_tr, col_site_tr],
         columns='Clean_Month',
-        values=col_site_tr, # Count
+        values=col_site_tr,
         aggfunc='count',
         fill_value=0
     )
 
-    # Pastikan seluruh kolom bulan 1-12 ada
+    # Pastikan seluruh kolom bulan Januari-Desember tersedia
     for m in all_months:
         if m not in pivot_track.columns:
             pivot_track[m] = 0
             
     pivot_track = pivot_track[all_months].reset_index()
 
-    # Kalkulasi Formulas
+    # Kalkulasi Formulas Sesuai Permintaan
+    # Kondisi: 0 berarti belum terima invoice, >1 berarti sudah terima invoice
+    pivot_track[all_months] = pivot_track[all_months].applymap(lambda x: 1 if x > 0 else 0)
+    
     pivot_track['Grand Total'] = pivot_track[all_months].sum(axis=1)
-    # Progress (%) = Grand Total / 12 bulan (dikonversi ke persentase)
+    # Progress (%) = grand total dibagi dengan 12 bulan
     pivot_track['Progress'] = (pivot_track['Grand Total'] / 12.0) * 100
-    # Invoice NY Received = 12 bulan - Grand Total (jika negatif dibatasi 0)
+    # Invoice NY Received = 12 bulan kurang grand total
     pivot_track['Invoice NY Received'] = (12 - pivot_track['Grand Total']).apply(lambda x: max(0, x))
 
-    # Metrik Ringkasan Atas
+    # Metrik Ringkasan di Bagian Atas
     total_sites = pivot_track[col_site_tr].nunique()
     avg_progress = pivot_track['Progress'].mean()
     total_ny_received = pivot_track['Invoice NY Received'].sum()
@@ -1376,14 +1379,14 @@ if not df_tracking.empty and col_reg_tr and col_supp_tr and col_site_tr and col_
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Chart Bar Visualisasi Progress Tracking
+    # Chart Bar Visualisasi Progress Tracking (%)
     st.markdown("📊 **Visualisasi Progress Tracking (%)**")
     chart_data = pivot_track.set_index(col_site_tr)['Grand Total']
     st.bar_chart(chart_data)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Render Tabel Tracking Invoice HTML
+    # Render Tabel HTML Tracking Invoice
     rows_html_tr = ""
     for idx, row in pivot_track.iterrows():
         reg_val = row[col_reg_tr]
@@ -1395,7 +1398,7 @@ if not df_tracking.empty and col_reg_tr and col_supp_tr and col_site_tr and col_
         prog_val = row['Progress']
         ny_recv = int(row['Invoice NY Received'])
         
-        # Kondisi warna merah jika Invoice NY Received > 0 atau sesuai gambar
+        # Highlight merah jika Invoice NY Received > 0 (belum diterima)
         ny_bg = "background-color: #ffcccc; color: #900; font-weight: bold;" if ny_recv > 0 else ""
         row_bg = "#ffffff" if idx % 2 == 0 else "#f9f9f9"
 
