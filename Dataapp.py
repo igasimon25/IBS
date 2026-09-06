@@ -537,26 +537,17 @@ def generate_reimbursement_summary_table(df):
         'Amount Paid': 'sum'
     })
 
-    # Urutkan berdasarkan Payment Month secara kronologis
-    if not summary.empty:
-        other_rows = summary[~summary[col_m].isin(summary[col_m])]
-        valid_summary = summary[summary[col_m].isin(summary[col_m])].copy()
-        
-        # Tambahkan kolom sort key sementara
-        def get_sort_key(val):
-            dt = pd.to_datetime(str(val), errors='coerce')
-            if pd.isna(dt):
-                dt = pd.to_datetime(str(val), format='%b %Y', errors='coerce')
-            if pd.isna(dt):
-                dt = pd.to_datetime(str(val), format='%B %Y', errors='coerce')
-            return dt if pd.notna(dt) else pd.Timestamp.min
+   # --- TAMBAHKAN LOGIKA SORTING DI SINI ---
+    def get_sort_key(val):
+        dt = pd.to_datetime(str(val), errors='coerce')
+        if pd.isna(dt):
+            dt = pd.to_datetime(str(val), format='%b-%y', errors='coerce')
+        if pd.isna(dt):
+            dt = pd.to_datetime(str(val), format='%b %Y', errors='coerce')
+        return dt if pd.notna(dt) else pd.Timestamp.min
 
-        valid_summary['_sort_key'] = valid_summary[col_m].apply(get_sort_key)
-        valid_summary = valid_summary.sort_values('_sort_key').drop(columns=['_sort_key'])
-        summary = valid_summary
-
-    summary['GAP'] = summary['NET AMOUNT'] - summary['Amount Paid Based on Setoff Data']
-
+    summary['_sort_key'] = summary[col_m].apply(get_sort_key)
+    summary = summary.sort_values('_sort_key').drop(columns=['_sort_key'])
     grand_total = pd.DataFrame([{
         col_m: 'Grand Total',
         'NET AMOUNT': summary['NET AMOUNT'].sum(),
