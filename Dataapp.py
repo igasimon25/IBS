@@ -919,3 +919,168 @@ if not df_risk_vat.empty:
     </html>
     """
     components.html(full_html_vat, height=550, scrolling=True)
+
+# ==========================================
+# 12. MANAGEMENT FEE PROCESS SUMMARY
+# ==========================================
+st.markdown("---")
+st.subheader("📊 Management Fee Process")
+
+def generate_manfee_summary(df):
+    df_calc = df.copy()
+
+    # Deteksi Kolom Periode Month
+    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
+    if col_m not in df_calc.columns:
+        return pd.DataFrame(), col_m
+
+    # Pastikan Kolom Nilai Tersedia / Buat Jika Belum Ada
+    manfee_cols = ['Total Manfee', 'Agent Share', 'Huawei Share']
+    for col in manfee_cols:
+        if col not in df_calc.columns:
+            # Fallback nama kolom sejenis
+            col_match = [c for c in df_calc.columns if col.lower() in c.lower()]
+            if col_match:
+                df_calc[col] = df_calc[col_match[0]]
+            else:
+                df_calc[col] = 0.0
+
+    # Cleaning & Type Casting Kolom Numerik ke Float (Aman dari String & Format Currency)
+    for col in manfee_cols:
+        df_calc[col] = (
+            df_calc[col]
+            .astype(str)
+            .str.replace(r'[^\d.-]', '', regex=True)
+            .replace('', '0')
+        )
+        df_calc[col] = pd.to_numeric(df_calc[col], errors='coerce').fillna(0.0)
+
+    # Deteksi Status Progress PR (RPJ to HTI)
+    col_status = 'Progress PR Status (RPJ to HTI)'
+    if col_status not in df_calc.columns:
+        # Fallback pencarian nama kolom status
+        match_st = [c for c in df_calc.columns if 'progress' in c.lower() or 'rpj' in c.lower()]
+        col_status = match_st[0] if match_st else 'Status'
+
+    status_series = df_calc[col_status].astype(str).str.upper().str.strip() if col_status in df_calc.columns else pd.Series('', index=df_calc.index)
+
+    # Filter Mask untuk PAID vs NOT YET
+    is_paid = status_series == 'PAID'
+
+    # Calculation Breakdown per Share Type & Status
+    df_calc['MANFEE_NY'] = np.where(~is_paid, df_calc['Total Manfee'], 0.0)
+    df_calc['MANFEE_PAID'] = np.where(is_paid, df_calc['Total Manfee'], 0.0)
+
+    df_calc['AGENT_NY'] = np.where(~is_paid, df_calc['Agent Share'], 0.0)
+    df_calc['AGENT_PAID'] = np.where(is_paid, df_calc['Agent Share'], 0.0)
+
+    df_calc['HUAWEI_NY'] = np.where(~is_paid, df_calc['Huawei Share'], 0.0)
+    df_calc['HUAWEI_PAID'] = np.where(is_paid, df_calc['Huawei Share'], 0.0)
+
+    # Groupby Periode Month
+    summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
+        'MANFEE_NY': 'sum',
+        'MANFEE_PAID': 'sum',
+        'AGENT_NY': 'sum',
+        'AGENT_PAID': 'sum',
+        'HUAWEI_NY': 'sum',
+        'HUAWEI_PAID': 'sum'
+    })
+
+    # Grand Total Row
+    grand_total = pd.DataFrame([{
+        col_m: '(blank)',
+        'MANFEE_NY': summary['MANFEE_NY'].sum(),
+        'MANFEE_PAID': summary['MANFEE_PAID'].sum(),
+        'AGENT_NY': summary['AGENT_NY'].sum(),
+        'AGENT_PAID': summary['AGENT_PAID'].sum(),
+        'HUAWEI_NY': summary['HUAWEI_NY'].sum(),
+        'HUAWEI_PAID': summary['HUAWEI_PAID'].sum()
+    }])
+
+    return pd.concat([summary, grand_total], ignore_index=True), col_m
+
+df_manfee, col_m_mf = generate_manfee_summary(df_filtered)
+
+if not df_manfee.empty:
+    def fmt_rp_mf(val):
+        if abs(val) < 1e-9:
+            return "Rp -"
+        elif val < 0:
+            return f"-Rp {abs(val):,.0f}".replace(",", ".")
+        else:
+            return f"Rp {val:,.0f}".replace(",", ".")
+
+    rows_html_mf = ""
+    for idx, row in df_manfee.iterrows():
+        val_m = row[col_m_mf]
+        is_total = (val_m == '(blank)' or val_m == 'Grand Total')
+        if pd.isna(val_m) or str(val_m).strip().lower() in ['nan', 'none', '']:
+            val_m = "(blank)"
+
+        row_style = "background-color: #ffffff; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #f9f9f9;")
+
+        rows_html_mf += f"""
+        <tr style="{row_style}">
+            <td style="text-align: center; border: 1px solid #d9d9d9; padding: 5px;">{val_m}</td>
+            
+            <!-- Sum of Total Manfee -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['MANFEE_NY'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['MANFEE_PAID'])}</td>
+            
+            <!-- Sum of AGENT Share -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['AGENT_NY'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['AGENT_PAID'])}</td>
+            
+            <!-- Sum of Huawei Share -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['HUAWEI_NY'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['HUAWEI_PAID'])}</td>
+        </tr>
+        """
+
+    full_html_mf = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
+        th {{ border: 1px solid #b0b0b0; padding: 6px; text-align: center; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+    <div style="overflow-x: auto; max-height: 500px;">
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="3" style="background-color: #f2f2f2; width: 10%;">Periode Month</th>
+                    <th colspan="6" style="background-color: #e6e6e6; color: #000;">Management Fee</th>
+                </tr>
+                <tr>
+                    <th colspan="2" style="background-color: #fff2cc; width: 30%;">Sum of Total Manfee</th>
+                    <th colspan="2" style="background-color: #d9e1f2; width: 30%;">Sum of AGENT Share</th>
+                    <th colspan="2" style="background-color: #fce4d6; width: 30%;">Sum of Huawei Share</th>
+                </tr>
+                <tr>
+                    <!-- Sub-header Sum of Total Manfee -->
+                    <th style="background-color: #fff2cc; width: 15%;">Not Yet</th>
+                    <th style="background-color: #fff2cc; width: 15%;">Paid</th>
+                    
+                    <!-- Sub-header Sum of AGENT Share -->
+                    <th style="background-color: #d9e1f2; width: 15%;">Not Yet</th>
+                    <th style="background-color: #d9e1f2; width: 15%;">Paid</th>
+                    
+                    <!-- Sub-header Sum of Huawei Share -->
+                    <th style="background-color: #fce4d6; width: 15%;">Not Yet</th>
+                    <th style="background-color: #fce4d6; width: 15%;">Paid</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html_mf}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_html_mf, height=480, scrolling=True)
