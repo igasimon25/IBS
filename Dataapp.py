@@ -760,7 +760,7 @@ if not df_tsel_agent.empty:
     </body>
     </html>
     """
-    components.html(full_html_tsel, height=650, scrolling=False)
+    components.html(full_html, height=650, scrolling=True)
 
 def generate_risk_vat_summary(df):
     df_calc = df.copy()
@@ -958,7 +958,7 @@ if not df_risk_vat.empty:
     </body>
     </html>
     """
-    components.html(full_html_vat, height=550, scrolling=False)
+    components.html(full_html, height=650, scrolling=True)
 
 # ==========================================
 # 12. MANAGEMENT FEE PROCESS SUMMARY
@@ -1124,7 +1124,7 @@ if not df_manfee.empty:
     </html>
     """
     
-components.html(full_trk_html, height=520, scrolling=False)
+    components.html(full_html, height=650, scrolling=True)
 
 
 # ==========================================
