@@ -99,46 +99,6 @@ except Exception as e:
 df_filtered = df_raw.copy()
 
 # ==========================================
-# HELPER SORTING PAYMENT MONTH (Oct 2024 onwards)
-# ==========================================
-def sort_payment_months(month_list):
-    """Mengurutkan bulan dari Oct 2024 sampai saat ini secara kronologis"""
-    cleaned_months = [str(x) for x in month_list if str(x).lower() not in ['nan', 'none', '', 'grand total', '(blank)']]
-    
-    # Mapping nama bulan ke angka untuk sorting
-    month_order = {
-        'jan': 1, 'january': 1, 'feb': 2, 'february': 2, 'mar': 3, 'march': 3,
-        'apr': 4, 'april': 4, 'may': 5, 'jun': 6, 'june': 6, 'jul': 7, 'july': 7,
-        'aug': 8, 'august': 8, 'sep': 9, 'september': 9, 'oct': 10, 'october': 10,
-        'nov': 11, 'november': 11, 'dec': 12, 'december': 12
-    }
-    
-    def parse_month_key(m_str):
-        m_str_lower = m_str.lower().strip()
-        # Cek format seperti "Oct 2024", "October 2024", "Oct-24", dll
-        found_m = 0
-        found_y = 2024
-        for m_name, m_num in month_order.items():
-            if m_name in m_str_lower:
-                found_m = m_num
-                break
-        
-        # Cari tahun 4 digit atau 2 digit
-        year_match = re.search(r'(20\d{2}|\b\d{2}\b)', m_str_lower)
-        if year_match:
-            y_str = year_match.group(1)
-            if len(y_str) == 2:
-                found_y = int('20' + y_str)
-            else:
-                found_y = int(y_str)
-                
-        return (found_y, found_m if found_m > 0 else 1)
-
-    # Urutkan berdasarkan tuple (Tahun, Bulan)
-    unique_sorted = sorted(list(set(cleaned_months)), key=parse_month_key)
-    return unique_sorted
-
-# ==========================================
 # 3. SIDEBAR CONTROL & GLOBAL FILTERS
 # ==========================================
 st.sidebar.header("🔍 Global Filters")
@@ -152,12 +112,10 @@ if 'Area' in df_raw.columns:
     if selected_area != "(All)":
         df_filtered = df_filtered[df_filtered['Area'] == selected_area]
 
-# Filter Payment Month (Urut dari Oct 2024)
+# Filter Payment Month
 col_month = 'Payment Month' if 'Payment Month' in df_filtered.columns else ('Month' if 'Month' in df_filtered.columns else None)
 if col_month and col_month in df_filtered.columns:
-    raw_months = df_filtered[col_month].dropna().unique().tolist()
-    sorted_months = sort_payment_months(raw_months)
-    list_month = ["(All Months)"] + sorted_months
+    list_month = ["(All Months)"] + [str(x) for x in df_filtered[col_month].dropna().unique().tolist() if str(x).lower() not in ['nan', 'none', '']]
     selected_month = st.sidebar.selectbox("Payment Month Filter", options=list_month, index=0)
     if selected_month != "(All Months)":
         df_filtered = df_filtered[df_filtered[col_month].astype(str) == selected_month]
@@ -204,7 +162,7 @@ def create_compact_donut_card(title, paid_val, ny_val, color_done='#558B2F', col
     )
 
     st.plotly_chart(fig, use_container_width=True, key=key)
-    st.markdown(f"<div style='font-size: 11px; text-align: center; color: #555;'>Done: <b>{paid_m:,.2f}</b> | NY: <b>{ny_m:,.2f}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size: 11px; text-align: center; color: #555;'>Done: <b>Rp {paid_m:,.2f}M</b><br>NY: <b>Rp {ny_m:,.2f}M</b></div>", unsafe_allow_html=True)
 
 # ==========================================
 # 4. 5 CHART KPI SEJAJAR HORIZONTAL
@@ -337,6 +295,9 @@ html_content = f"""
     .sla-label {{ font-size: 10px; font-weight: bold; color: #555; margin-top: 6px; }}
     .arrow-right {{ font-size: 20px; color: #1f497d; font-weight: bold; margin-top: 45px; }}
     .arrow-down {{ font-size: 22px; color: #1f497d; font-weight: bold; text-align: right; padding-right: 40px; margin-top: -10px; margin-bottom: -10px; }}
+    .legend-container {{ display: flex; justify-content: flex-end; gap: 15px; margin-top: 20px; }}
+    .legend-item {{ display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: bold; color: #333; }}
+    .legend-box {{ width: 30px; height: 14px; border-radius: 3px; border: 1px solid #ccc; }}
 </style>
 </head>
 <body>
@@ -434,7 +395,7 @@ if 'Area' in df_filtered.columns:
             height=160
         )
         st.plotly_chart(fig, use_container_width=True, key=key)
-        st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; color: #222; margin-top: -10px;'>Done: {done_bn:,.2f} | NY: {ny_bn:,.2f}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; color: #222; margin-top: -10px;'><span style='color: #888;'>NY: {ny_bn:,.2f}</span> | <span>Done: {done_bn:,.2f}</span></div>", unsafe_allow_html=True)
 
     for idx, area_name in enumerate(unique_areas):
         df_area = df_filtered[df_filtered['Area'] == area_name]
@@ -506,8 +467,7 @@ if col_reg in df_inv_reg.columns and col_status_sap in df_inv_reg.columns and co
                 values=[done_m, ny_m],
                 hole=0.65,
                 marker=dict(colors=['#2F5597', '#A6A6A6']),
-                textinfo='none',
-                hovertemplate="<b>%{label}</b><br>Nominal: %{value:.2f} Bn IDR<extra></extra>"
+                textinfo='none'
             )])
             fig.update_layout(
                 annotations=[dict(text=f"<b>{pct_done:.1f}%</b>", x=0.5, y=0.5, font_size=14, showarrow=False)],
@@ -516,7 +476,6 @@ if col_reg in df_inv_reg.columns and col_status_sap in df_inv_reg.columns and co
                 height=160
             )
             st.plotly_chart(fig, use_container_width=True, key=f"chart_reg_{idx}")
-            st.markdown(f"<div style='text-align: center; font-size: 11px; font-weight: bold; color: #222; margin-top: -10px;'>Done: {done_m:,.2f} | NY: {ny_m:,.2f}</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -554,22 +513,6 @@ def generate_reimbursement_summary_table(df):
     })
 
     summary['GAP'] = summary['NET AMOUNT'] - summary['Amount Paid Based on Setoff Data']
-    
-    # Sorting berdasarkan Payment Month kronologis mulai dari Oct 2024
-    if col_m in summary.columns:
-        valid_rows = summary[~summary[col_m].astype(str).str.lower().isin(['nan', 'none', '', 'grand total', '(blank)'])].copy()
-        blank_rows = summary[summary[col_m].astype(str).str.lower().isin(['nan', 'none', '', '(blank)'])].copy()
-        
-        sorted_m_names = sort_payment_months(valid_rows[col_m].tolist())
-        # Masukkan juga bulan lain yang mungkin tidak ter-filter sempurna tapi ada di data
-        existing_m = valid_rows[col_m].astype(str).tolist()
-        other_m = [m for m in existing_m if m not in sorted_m_names]
-        final_m_order = sorted_m_names + other_m
-        
-        valid_rows['__sort_idx'] = valid_rows[col_m].astype(str).apply(lambda x: final_m_order.index(x) if x in final_m_order else 999)
-        valid_rows = valid_rows.sort_values('__sort_idx').drop(columns=['__sort_idx'])
-        
-        summary = pd.concat([valid_rows, blank_rows], ignore_index=True)
 
     grand_total = pd.DataFrame([{
         col_m: 'Grand Total',
@@ -655,22 +598,27 @@ st.subheader("📊 Reimbursement Summary to TSEL & Agent")
 def generate_tsel_agent_summary(df):
     df_calc = df.copy()
     
+    # Deteksi Kolom Bulan
     col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
     if col_m not in df_calc.columns or 'NET AMOUNT' not in df_calc.columns:
         return pd.DataFrame(), col_m
 
+    # Standardisasi String Kolom
     col_inv = 'Invoice Agent' if 'Invoice Agent' in df_calc.columns else 'Invoice Agent Status'
     col_dn = 'Status Reimburse Actual' if 'Status Reimburse Actual' in df_calc.columns else ('DN HW' if 'DN HW' in df_calc.columns else 'Status Reimburse')
 
+    # Status Conditions
     inv_series = df_calc[col_inv].astype(str).str.upper().str.strip() if col_inv in df_calc.columns else pd.Series('', index=df_calc.index)
     dn_series = df_calc[col_dn].astype(str).str.upper().str.strip() if col_dn in df_calc.columns else pd.Series('', index=df_calc.index)
 
+    # Filtering Logic per Row
     df_calc['INV_DONE'] = np.where(inv_series == 'INVOICE DONE', df_calc['NET AMOUNT'], 0)
     df_calc['INV_NY'] = np.where(inv_series != 'INVOICE DONE', df_calc['NET AMOUNT'], 0)
 
     df_calc['DN_DONE'] = np.where(dn_series.isin(['PAID', 'DN ISSUED']), df_calc['NET AMOUNT'], 0)
     df_calc['DN_NY'] = np.where(~dn_series.isin(['PAID', 'DN ISSUED']), df_calc['NET AMOUNT'], 0)
 
+    # Groupby Month
     summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
         'NET AMOUNT': 'sum',
         'INV_DONE': 'sum',
@@ -679,21 +627,7 @@ def generate_tsel_agent_summary(df):
         'DN_NY': 'sum'
     })
 
-    # Sorting berdasarkan Payment Month kronologis mulai dari Oct 2024
-    if col_m in summary.columns:
-        valid_rows = summary[~summary[col_m].astype(str).str.lower().isin(['nan', 'none', '', 'grand total', '(blank)'])].copy()
-        blank_rows = summary[summary[col_m].astype(str).str.lower().isin(['nan', 'none', '', '(blank)'])].copy()
-        
-        sorted_m_names = sort_payment_months(valid_rows[col_m].tolist())
-        existing_m = valid_rows[col_m].astype(str).tolist()
-        other_m = [m for m in existing_m if m not in sorted_m_names]
-        final_m_order = sorted_m_names + other_m
-        
-        valid_rows['__sort_idx'] = valid_rows[col_m].astype(str).apply(lambda x: final_m_order.index(x) if x in final_m_order else 999)
-        valid_rows = valid_rows.sort_values('__sort_idx').drop(columns=['__sort_idx'])
-        
-        summary = pd.concat([valid_rows, blank_rows], ignore_index=True)
-
+    # Total Row
     grand_total = pd.DataFrame([{
         col_m: 'Grand Total',
         'NET AMOUNT': summary['NET AMOUNT'].sum(),
@@ -705,6 +639,7 @@ def generate_tsel_agent_summary(df):
 
     full_summary = pd.concat([summary, grand_total], ignore_index=True)
 
+    # Formulas % Done
     full_summary['PCT_TSEL'] = np.where(full_summary['NET AMOUNT'] > 0, (full_summary['INV_DONE'] / full_summary['NET AMOUNT']) * 100, 0.0)
     full_summary['PCT_AGENT'] = np.where(full_summary['NET AMOUNT'] > 0, (full_summary['DN_DONE'] / full_summary['NET AMOUNT']) * 100, 0.0)
 
@@ -754,26 +689,27 @@ if not df_tsel_agent.empty:
     <style>
         body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
         table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
-        th {{ border: 1px solid #d9d9d9; padding: 6px; text-align: center; font-weight: bold; }}
+        th {{ border: 1px solid #b0b0b0; padding: 6px; text-align: center; font-weight: bold; }}
     </style>
     </head>
     <body>
-    <div style="overflow-x: auto;">
+    <div style="overflow-x: auto; max-height: 480px;">
         <table>
             <thead>
                 <tr>
-                    <th rowspan="2" style="background-color: #d9e1f2; width: 11%;">Payment Month</th>
-                    <th rowspan="2" style="background-color: #b4c6e7;">NET AMOUNT</th>
-                    <th colspan="3" style="background-color: #f8cbad;">Reimbursement to TSEL</th>
-                    <th colspan="3" style="background-color: #c6efce;">Reimbursement to Agent</th>
+                    <th rowspan="2" style="background-color: #d9d9d9; width: 10%;">Periode Month</th>
+                    <th rowspan="2" style="background-color: #d9d9d9; width: 13%;">NET AMOUNT</th>
+                    <th colspan="3" style="background-color: #f8c2a6; color: #000;">Reimbursement to TSEL</th>
+                    <th colspan="3" style="background-color: #a9d08e; color: #000;">Reimbursement to Agent</th>
                 </tr>
                 <tr>
-                    <th style="background-color: #fce4d6;">Done</th>
-                    <th style="background-color: #fce4d6;">Not Yet</th>
-                    <th style="background-color: #fce4d6;">% Done</th>
-                    <th style="background-color: #e2efda;">Done</th>
-                    <th style="background-color: #e2efda;">Not Yet</th>
-                    <th style="background-color: #e2efda;">% Done</th>
+                    <th style="background-color: #fce4d6; width: 13%;">INV. DONE</th>
+                    <th style="background-color: #fce4d6; width: 13%;">INV. NY</th>
+                    <th style="background-color: #f8c2a6; width: 8%;">% Done</th>
+                    
+                    <th style="background-color: #e2efda; width: 13%;">DebitNote DONE</th>
+                    <th style="background-color: #e2efda; width: 13%;">DebitNote NY</th>
+                    <th style="background-color: #a9d08e; width: 8%;">% Done</th>
                 </tr>
             </thead>
             <tbody>
@@ -785,3 +721,808 @@ if not df_tsel_agent.empty:
     </html>
     """
     components.html(full_html_tsel, height=550, scrolling=True)
+
+def generate_risk_vat_summary(df):
+    df_calc = df.copy()
+
+    # Deteksi Kolom Bulan
+    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
+    if col_m not in df_calc.columns or 'NET AMOUNT' not in df_calc.columns:
+        return pd.DataFrame(), col_m
+
+    # Pastikan Kolom PPN Ada
+    if 'PPN' not in df_calc.columns:
+        if 'VAT Amount' in df_calc.columns:
+            df_calc['PPN'] = df_calc['VAT Amount']
+        else:
+            df_calc['PPN'] = 0.0
+
+    # Clean & Convert Kolom Numerik ke Float (Aman dari String/Format Rupiah)
+    for col in ['NET AMOUNT', 'PPN']:
+        if col in df_calc.columns:
+            df_calc[col] = (
+                df_calc[col]
+                .astype(str)
+                .str.replace(r'[^\d.-]', '', regex=True)
+                .replace('', '0')
+            )
+            df_calc[col] = pd.to_numeric(df_calc[col], errors='coerce').fillna(0.0)
+
+    col_fp = 'Status FP' if 'Status FP' in df_calc.columns else 'Status_FP'
+    fp_series = df_calc[col_fp].astype(str).str.upper().str.strip() if col_fp in df_calc.columns else pd.Series('', index=df_calc.index)
+
+    # Break Down Net Amount Berdasarkan Status FP
+    df_calc['NET_NORMAL'] = np.where(fp_series == 'NORMAL', df_calc['NET AMOUNT'], 0.0)
+    df_calc['NET_POTENTIAL'] = np.where(fp_series.isin(['POTENTIAL EXPIRED', 'POTENTIAL EXPIRED ']), df_calc['NET AMOUNT'], 0.0)
+    df_calc['NET_EXPIRED'] = np.where(fp_series == 'FP EXPIRED', df_calc['NET AMOUNT'], 0.0)
+
+    # FP Expired Specific Metrics
+    mask_expired = (fp_series == 'FP EXPIRED')
+    df_calc['FP_EXP_NET_MINUS_VAT'] = np.where(mask_expired, df_calc['NET AMOUNT'] - df_calc['PPN'], 0.0)
+    df_calc['VAT_LOSS'] = np.where(mask_expired, df_calc['PPN'], 0.0)
+
+    # Groupby Periode Month
+    summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
+        'NET_NORMAL': 'sum',
+        'NET_POTENTIAL': 'sum',
+        'NET_EXPIRED': 'sum',
+        'NET AMOUNT': 'sum',
+        'FP_EXP_NET_MINUS_VAT': 'sum',
+        'VAT_LOSS': 'sum'
+    })
+
+    # Grand Total Row
+    grand_total = pd.DataFrame([{
+        col_m: 'Grand Total',
+        'NET_NORMAL': summary['NET_NORMAL'].sum(),
+        'NET_POTENTIAL': summary['NET_POTENTIAL'].sum(),
+        'NET_EXPIRED': summary['NET_EXPIRED'].sum(),
+        'NET AMOUNT': summary['NET AMOUNT'].sum(),
+        'FP_EXP_NET_MINUS_VAT': summary['FP_EXP_NET_MINUS_VAT'].sum(),
+        'VAT_LOSS': summary['VAT_LOSS'].sum()
+    }])
+
+    return pd.concat([summary, grand_total], ignore_index=True), col_m
+# ==========================================
+# 11. RISK VAT HUAWEI SUMMARY
+# ==========================================
+st.markdown("---")
+st.subheader("⚠️ Risk VAT Huawei Summary")
+
+def generate_risk_vat_summary(df):
+    df_calc = df.copy()
+
+    # Deteksi Kolom Bulan
+    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
+    if col_m not in df_calc.columns or 'NET AMOUNT' not in df_calc.columns:
+        return pd.DataFrame(), col_m
+
+    # Pastikan Kolom PPN Ada
+    if 'PPN' not in df_calc.columns:
+        if 'VAT Amount' in df_calc.columns:
+            df_calc['PPN'] = df_calc['VAT Amount']
+        else:
+            df_calc['PPN'] = 0.0
+
+    # Cleaning & Type Casting Kolom Numerik ke Float
+    for col in ['NET AMOUNT', 'PPN']:
+        if col in df_calc.columns:
+            df_calc[col] = (
+                df_calc[col]
+                .astype(str)
+                .str.replace(r'[^\d.-]', '', regex=True)
+                .replace('', '0')
+            )
+            df_calc[col] = pd.to_numeric(df_calc[col], errors='coerce').fillna(0.0)
+
+    col_fp = 'Status FP' if 'Status FP' in df_calc.columns else 'Status_FP'
+    fp_series = df_calc[col_fp].astype(str).str.upper().str.strip() if col_fp in df_calc.columns else pd.Series('', index=df_calc.index)
+
+    # Break Down Net Amount Berdasarkan Status FP
+    df_calc['NET_NORMAL'] = np.where(fp_series == 'NORMAL', df_calc['NET AMOUNT'], 0.0)
+    df_calc['NET_POTENTIAL'] = np.where(fp_series.isin(['POTENTIAL EXPIRED', 'POTENTIAL EXPIRED ']), df_calc['NET AMOUNT'], 0.0)
+    df_calc['NET_EXPIRED'] = np.where(fp_series == 'FP EXPIRED', df_calc['NET AMOUNT'], 0.0)
+
+    # FP Expired Specific Metrics
+    mask_expired = (fp_series == 'FP EXPIRED')
+    df_calc['FP_EXP_NET_MINUS_VAT'] = np.where(mask_expired, df_calc['NET AMOUNT'] - df_calc['PPN'], 0.0)
+    df_calc['VAT_LOSS'] = np.where(mask_expired, df_calc['PPN'], 0.0)
+
+    # Groupby Periode Month
+    summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
+        'NET_NORMAL': 'sum',
+        'NET_POTENTIAL': 'sum',
+        'NET_EXPIRED': 'sum',
+        'NET AMOUNT': 'sum',
+        'FP_EXP_NET_MINUS_VAT': 'sum',
+        'VAT_LOSS': 'sum'
+    })
+
+    # Grand Total Row
+    grand_total = pd.DataFrame([{
+        col_m: 'Grand Total',
+        'NET_NORMAL': summary['NET_NORMAL'].sum(),
+        'NET_POTENTIAL': summary['NET_POTENTIAL'].sum(),
+        'NET_EXPIRED': summary['NET_EXPIRED'].sum(),
+        'NET AMOUNT': summary['NET AMOUNT'].sum(),
+        'FP_EXP_NET_MINUS_VAT': summary['FP_EXP_NET_MINUS_VAT'].sum(),
+        'VAT_LOSS': summary['VAT_LOSS'].sum()
+    }])
+
+    return pd.concat([summary, grand_total], ignore_index=True), col_m
+
+df_risk_vat, col_m_vat = generate_risk_vat_summary(df_filtered)
+
+if not df_risk_vat.empty:
+    def fmt_rp_vat(val):
+        if abs(val) < 1e-9:
+            return "Rp -"
+        elif val < 0:
+            return f"-Rp {abs(val):,.0f}".replace(",", ".")
+        else:
+            return f"Rp {val:,.0f}".replace(",", ".")
+
+    rows_html_vat = ""
+    for idx, row in df_risk_vat.iterrows():
+        val_m = row[col_m_vat]
+        is_total = (val_m == 'Grand Total')
+        if pd.isna(val_m) or str(val_m).strip().lower() in ['nan', 'none', '']:
+            val_m = "(blank)"
+
+        row_style = "background-color: #b4c6e7; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #f2f2f2;")
+
+        rows_html_vat += f"""
+        <tr style="{row_style}">
+            <td style="text-align: center; border: 1px solid #7f7f7f; padding: 5px;">{val_m}</td>
+            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['NET_NORMAL'])}</td>
+            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['NET_POTENTIAL'])}</td>
+            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['NET_EXPIRED'])}</td>
+            <td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['NET AMOUNT'])}</td>
+            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['FP_EXP_NET_MINUS_VAT'])}</td>
+            <td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['VAT_LOSS'])}</td>
+        </tr>
+        """
+
+    full_html_vat = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
+        th {{ border: 1px solid #7f7f7f; padding: 6px; text-align: center; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+    <div style="overflow-x: auto; max-height: 480px;">
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2" style="background-color: #d9e1f2; width: 12%;">Periode Month</th>
+                    <th colspan="4" style="background-color: #ffc000; color: #000;">Net Amount</th>
+                    <th rowspan="2" style="background-color: #ffff00; width: 16%;">FP Exp Net Amount-VAT(ppn)</th>
+                    <th rowspan="2" style="background-color: #ffff00; width: 14%;">VAT Loss</th>
+                </tr>
+                <tr>
+                    <th style="background-color: #ffc000; width: 14%;">Normal</th>
+                    <th style="background-color: #ffc000; width: 14%;">Potential Expired</th>
+                    <th style="background-color: #ffc000; width: 14%;">FP Expired</th>
+                    <th style="background-color: #ffc000; width: 16%;">Total Net Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html_vat}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_html_vat, height=550, scrolling=True)
+
+# ==========================================
+# 12. MANAGEMENT FEE PROCESS SUMMARY
+# ==========================================
+st.markdown("---")
+st.subheader("📊 Management Fee Process")
+
+def generate_manfee_summary(df):
+    df_calc = df.copy()
+
+    # Deteksi Kolom Periode Month
+    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
+    if col_m not in df_calc.columns:
+        return pd.DataFrame(), col_m
+
+    # Pastikan Kolom Nilai Tersedia / Buat Jika Belum Ada
+    manfee_cols = ['Total Manfee', 'Agent Share', 'Huawei Share']
+    for col in manfee_cols:
+        if col not in df_calc.columns:
+            # Fallback nama kolom sejenis
+            col_match = [c for c in df_calc.columns if col.lower() in c.lower()]
+            if col_match:
+                df_calc[col] = df_calc[col_match[0]]
+            else:
+                df_calc[col] = 0.0
+
+    # Cleaning & Type Casting Kolom Numerik ke Float (Aman dari String & Format Currency)
+    for col in manfee_cols:
+        df_calc[col] = (
+            df_calc[col]
+            .astype(str)
+            .str.replace(r'[^\d.-]', '', regex=True)
+            .replace('', '0')
+        )
+        df_calc[col] = pd.to_numeric(df_calc[col], errors='coerce').fillna(0.0)
+
+    # Deteksi Status Progress PR (RPJ to HTI)
+    col_status = 'Progress PR Status (RPJ to HTI)'
+    if col_status not in df_calc.columns:
+        # Fallback pencarian nama kolom status
+        match_st = [c for c in df_calc.columns if 'progress' in c.lower() or 'rpj' in c.lower()]
+        col_status = match_st[0] if match_st else 'Status'
+
+    status_series = df_calc[col_status].astype(str).str.upper().str.strip() if col_status in df_calc.columns else pd.Series('', index=df_calc.index)
+
+    # Filter Mask untuk PAID vs NOT YET
+    is_paid = status_series == 'PAID'
+
+    # Calculation Breakdown per Share Type & Status
+    df_calc['MANFEE_NY'] = np.where(~is_paid, df_calc['Total Manfee'], 0.0)
+    df_calc['MANFEE_PAID'] = np.where(is_paid, df_calc['Total Manfee'], 0.0)
+
+    df_calc['AGENT_NY'] = np.where(~is_paid, df_calc['Agent Share'], 0.0)
+    df_calc['AGENT_PAID'] = np.where(is_paid, df_calc['Agent Share'], 0.0)
+
+    df_calc['HUAWEI_NY'] = np.where(~is_paid, df_calc['Huawei Share'], 0.0)
+    df_calc['HUAWEI_PAID'] = np.where(is_paid, df_calc['Huawei Share'], 0.0)
+
+    # Groupby Periode Month
+    summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
+        'MANFEE_NY': 'sum',
+        'MANFEE_PAID': 'sum',
+        'AGENT_NY': 'sum',
+        'AGENT_PAID': 'sum',
+        'HUAWEI_NY': 'sum',
+        'HUAWEI_PAID': 'sum'
+    })
+
+    # Grand Total Row
+    grand_total = pd.DataFrame([{
+        col_m: '(blank)',
+        'MANFEE_NY': summary['MANFEE_NY'].sum(),
+        'MANFEE_PAID': summary['MANFEE_PAID'].sum(),
+        'AGENT_NY': summary['AGENT_NY'].sum(),
+        'AGENT_PAID': summary['AGENT_PAID'].sum(),
+        'HUAWEI_NY': summary['HUAWEI_NY'].sum(),
+        'HUAWEI_PAID': summary['HUAWEI_PAID'].sum()
+    }])
+
+    return pd.concat([summary, grand_total], ignore_index=True), col_m
+
+df_manfee, col_m_mf = generate_manfee_summary(df_filtered)
+
+if not df_manfee.empty:
+    def fmt_rp_mf(val):
+        if abs(val) < 1e-9:
+            return "Rp -"
+        elif val < 0:
+            return f"-Rp {abs(val):,.0f}".replace(",", ".")
+        else:
+            return f"Rp {val:,.0f}".replace(",", ".")
+
+    rows_html_mf = ""
+    for idx, row in df_manfee.iterrows():
+        val_m = row[col_m_mf]
+        is_total = (val_m == '(blank)' or val_m == 'Grand Total')
+        if pd.isna(val_m) or str(val_m).strip().lower() in ['nan', 'none', '']:
+            val_m = "(blank)"
+
+        row_style = "background-color: #ffffff; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #f9f9f9;")
+
+        rows_html_mf += f"""
+        <tr style="{row_style}">
+            <td style="text-align: center; border: 1px solid #d9d9d9; padding: 5px;">{val_m}</td>
+            
+            <!-- Sum of Total Manfee -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['MANFEE_NY'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['MANFEE_PAID'])}</td>
+            
+            <!-- Sum of AGENT Share -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['AGENT_NY'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['AGENT_PAID'])}</td>
+            
+            <!-- Sum of Huawei Share -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['HUAWEI_NY'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_mf(row['HUAWEI_PAID'])}</td>
+        </tr>
+        """
+
+    full_html_mf = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
+        th {{ border: 1px solid #b0b0b0; padding: 6px; text-align: center; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+    <div style="overflow-x: auto; max-height: 500px;">
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="3" style="background-color: #f2f2f2; width: 10%;">Periode Month</th>
+                    <th colspan="6" style="background-color: #e6e6e6; color: #000;">Management Fee</th>
+                </tr>
+                <tr>
+                    <th colspan="2" style="background-color: #fff2cc; width: 30%;">Sum of Total Manfee</th>
+                    <th colspan="2" style="background-color: #d9e1f2; width: 30%;">Sum of AGENT Share</th>
+                    <th colspan="2" style="background-color: #fce4d6; width: 30%;">Sum of Huawei Share</th>
+                </tr>
+                <tr>
+                    <!-- Sub-header Sum of Total Manfee -->
+                    <th style="background-color: #fff2cc; width: 15%;">Not Yet</th>
+                    <th style="background-color: #fff2cc; width: 15%;">Paid</th>
+                    
+                    <!-- Sub-header Sum of AGENT Share -->
+                    <th style="background-color: #d9e1f2; width: 15%;">Not Yet</th>
+                    <th style="background-color: #d9e1f2; width: 15%;">Paid</th>
+                    
+                    <!-- Sub-header Sum of Huawei Share -->
+                    <th style="background-color: #fce4d6; width: 15%;">Not Yet</th>
+                    <th style="background-color: #fce4d6; width: 15%;">Paid</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html_mf}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_html_mf, height=480, scrolling=True)
+
+# ==========================================
+# 13. STATUS REJECTION SAP SUMMARY (DROPDOWN MULTI-SELECT)
+# ==========================================
+st.markdown("---")
+st.subheader("❌ Status Rejection SAP")
+
+# Deteksi Kolom Area dan PIC Site secara dinamis
+col_area_candidates = ['Area (Khusus SAP)', 'Area', 'Region']
+col_pic_candidates = ['PIC Site (Khusus SAP)', 'PIC Site', 'PIC']
+
+col_area = next((c for c in col_area_candidates if c in df_filtered.columns), None)
+col_pic = next((c for c in col_pic_candidates if c in df_filtered.columns), None)
+
+df_rej_filtered = df_filtered.copy()
+
+# Filter Subheader Menggunakan Dropdown Multi-select Streamlit
+st.markdown("**Filter Rejection SAP**")
+f_col1, f_col2 = st.columns(2)
+
+with f_col1:
+    if col_area:
+        unique_areas = sorted(df_filtered[col_area].dropna().astype(str).unique())
+        selected_areas = st.multiselect(
+            "Area (Khusus SAP)", 
+            options=unique_areas, 
+            default=unique_areas, 
+            key="rej_area_multiselect"
+        )
+        if selected_areas:
+            df_rej_filtered = df_rej_filtered[df_rej_filtered[col_area].astype(str).isin(selected_areas)]
+        else:
+            df_rej_filtered = df_rej_filtered.iloc[0:0] # Kosongkan jika tidak ada yang dipilih
+
+with f_col2:
+    if col_pic:
+        unique_pics = sorted(df_filtered[col_pic].dropna().astype(str).unique())
+        selected_pics = st.multiselect(
+            "PIC Site (Khusus SAP)", 
+            options=unique_pics, 
+            default=unique_pics, 
+            key="rej_pic_multiselect"
+        )
+        if selected_pics:
+            df_rej_filtered = df_rej_filtered[df_rej_filtered[col_pic].astype(str).isin(selected_pics)]
+        else:
+            df_rej_filtered = df_rej_filtered.iloc[0:0]
+
+def generate_rejection_sap_summary(df):
+    df_calc = df.copy()
+
+    col_reg = 'new regional' if 'new regional' in df_calc.columns else ('Regional' if 'Regional' in df_calc.columns else None)
+    col_inv_type = 'IBS Invoice Type' if 'IBS Invoice Type' in df_calc.columns else ('Invoice Type' if 'Invoice Type' in df_calc.columns else None)
+    col_inv_no = 'Invoice No' if 'Invoice No' in df_calc.columns else ('No Invoice' if 'No Invoice' in df_calc.columns else None)
+    col_sap = 'StatusSAP' if 'StatusSAP' in df_calc.columns else ('Status SAP' if 'Status SAP' in df_calc.columns else None)
+
+    if not col_reg or not col_inv_type or not col_sap:
+        return pd.DataFrame(), None, None, 0, 0.0
+
+    # Cleaning & Casting NET AMOUNT
+    if 'NET AMOUNT' in df_calc.columns:
+        df_calc['NET AMOUNT'] = (
+            df_calc['NET AMOUNT']
+            .astype(str)
+            .str.replace(r'[^\d.-]', '', regex=True)
+            .replace('', '0')
+        )
+        df_calc['NET AMOUNT'] = pd.to_numeric(df_calc['NET AMOUNT'], errors='coerce').fillna(0.0)
+    else:
+        df_calc['NET AMOUNT'] = 0.0
+
+    # Filter khusus Status SAP == "REJECTED"
+    sap_series = df_calc[col_sap].astype(str).str.upper().str.strip()
+    df_rejected = df_calc[sap_series == 'REJECTED'].copy()
+
+    if df_rejected.empty:
+        return pd.DataFrame(), col_reg, col_inv_type, 0, 0.0
+
+    # Groupby berdasarkan new regional dan IBS Invoice Type
+    summary = df_rejected.groupby([col_reg, col_inv_type], as_index=False, dropna=False).agg(
+        Count_of_Invoice_No=(col_inv_no, 'count') if col_inv_no else (col_reg, 'count'),
+        Sum_of_NET_AMOUNT=('NET AMOUNT', 'sum')
+    )
+
+    summary = summary.sort_values(by=[col_reg, col_inv_type]).reset_index(drop=True)
+
+    total_count = int(summary['Count_of_Invoice_No'].sum())
+    total_net = float(summary['Sum_of_NET_AMOUNT'].sum())
+
+    return summary, col_reg, col_inv_type, total_count, total_net
+
+df_reject_summary, col_reg_name, col_type_name, total_inv_count, total_net_amt = generate_rejection_sap_summary(df_rej_filtered)
+
+if not df_reject_summary.empty and col_reg_name:
+    # Metrik Ringkasan di atas Tabel
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; border-radius: 5px;">
+            <p style="margin: 0; font-size: 12px; color: #6c757d; font-weight: bold;">Total Count of Invoice No</p>
+            <h3 style="margin: 0; color: #212529;">{total_inv_count:,}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col_m2:
+        formatted_total_net = f"Rp {total_net_amt:,.0f}".replace(",", ".")
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; border-radius: 5px;">
+            <p style="margin: 0; font-size: 12px; color: #6c757d; font-weight: bold;">Total NET AMOUNT</p>
+            <h3 style="margin: 0; color: #212529;">{formatted_total_net}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Render Tabel HTML
+    rows_html_reject = ""
+    for idx, row in df_reject_summary.iterrows():
+        reg_val = row[col_reg_name]
+        type_val = row[col_type_name]
+        cnt_val = row['Count_of_Invoice_No']
+        net_val = row['Sum_of_NET_AMOUNT']
+        
+        formatted_net = f"Rp {net_val:,.0f}".replace(",", ".")
+        row_bg = "#ffffff" if idx % 2 == 0 else "#f9f9f9"
+
+        rows_html_reject += f"""
+        <tr style="background-color: {row_bg};">
+            <td style="border: 1px solid #d9d9d9; padding: 6px; text-align: left;">{reg_val}</td>
+            <td style="border: 1px solid #d9d9d9; padding: 6px; text-align: center;">{type_val}</td>
+            <td style="border: 1px solid #d9d9d9; padding: 6px; text-align: center;">{cnt_val:,}</td>
+            <td style="border: 1px solid #d9d9d9; padding: 6px; text-align: right;">{formatted_net}</td>
+        </tr>
+        """
+
+    full_html_reject = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
+        th {{ border: 1px solid #b0b0b0; padding: 8px; text-align: center; background-color: #f2f2f2; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+    <div style="overflow-x: auto; max-height: 450px;">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 35%;">new regional</th>
+                    <th style="width: 15%;">IBS Invoice Type</th>
+                    <th style="width: 20%;">Count of Invoice No</th>
+                    <th style="width: 30%;">Sum of NET AMOUNT</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html_reject}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_html_reject, height=400, scrolling=True)
+else:
+    st.info("Tidak ada data dengan Status SAP 'Rejected' yang sesuai dengan pilihan filter saat ini.")
+
+
+# ==========================================
+# STATUS TRACKING INV BM (WITH STICKY HEADER)
+# ==========================================
+st.markdown("---")
+st.subheader("📊 Status Tracking Invoice BM")
+
+# 1. MENDAPATKAN DATAFRAME DARI SCRIPT UTAMA
+df_source = None
+for var_name in ['df', 'data', 'df_filtered']:
+    if var_name in locals():
+        df_source = locals()[var_name]
+        break
+    elif var_name in globals():
+        df_source = globals()[var_name]
+        break
+    elif hasattr(st, 'session_state') and var_name in st.session_state:
+        df_source = st.session_state[var_name]
+        break
+
+if df_source is None or not isinstance(df_source, pd.DataFrame) or df_source.empty:
+    dummy_data = {
+        'Area': ['Area 1', 'Area 1', 'Area 1', 'Area 2'],
+        'Year': [2024, 2024, 2024, 2024],
+        'PIC Site': ['Alex', 'Alex', 'Budi', 'Cici'],
+        'new regional': ['RO3_Jakarta Banten', 'RO3_Jakarta Banten', 'RO3_Jakarta Banten', 'RO3_Jakarta Banten'],
+        'Supplier Name': ['PT. Batara Tabaraka', 'PT. POS PROPERTI INDO', 'Apartamen Oasis Mitra', 'ASURANSI KREDIT INDON'],
+        'Site ID': ['JKP187', 'JKP020', 'JKP652', 'JKP692'],
+        'Invoice No.': ['INV-01', 'INV-02', 'INV-03', 'INV-04'],
+        'Month': ['Jan', 'Feb', 'Mar', 'Apr']
+    }
+    df_source = pd.DataFrame(dummy_data)
+
+# Pembersihan awal nama kolom & duplikasi dataframe utama
+df_source = df_source.loc[:, ~df_source.columns.duplicated()].copy()
+for col in df_source.columns:
+    if isinstance(df_source[col], pd.DataFrame):
+        df_source[col] = df_source[col].iloc[:, 0]
+
+# ------------------------------------------
+# 2. FILTER DATA (AREA, YEAR, PIC SITE, NEW REGIONAL)
+# ------------------------------------------
+col_area = next((c for c in ['Area (Khusus SAP)', 'Area', 'Region'] if c in df_source.columns), None)
+col_year = next((c for c in ['Year', 'Tahun', 'Payment Year'] if c in df_source.columns), None)
+col_pic = next((c for c in ['PIC Site (Khusus SAP)', 'PIC Site', 'PIC', 'pic_site'] if c in df_source.columns), None)
+col_reg = next((c for c in ['new regional', 'Regional', 'regional'] if c in df_source.columns), None)
+
+st.markdown("#### 🔍 Filter Data Tracking")
+f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+
+with f_col1:
+    opts_area = ["All"] + sorted(list(df_source[col_area].dropna().astype(str).unique())) if col_area else ["All"]
+    sel_area = st.selectbox("Select Area", opts_area, key="trk_area_github_v5")
+
+with f_col2:
+    opts_year = ["All"] + sorted(list(df_source[col_year].dropna().astype(str).unique())) if col_year else ["All"]
+    sel_year = st.selectbox("Select Year", opts_year, key="trk_year_github_v5")
+
+with f_col3:
+    opts_pic = ["All"] + sorted(list(df_source[col_pic].dropna().astype(str).unique())) if col_pic else ["All"]
+    sel_pic = st.selectbox("Select PIC Site", opts_pic, key="trk_pic_github_v5")
+
+with f_col4:
+    opts_reg = ["All"] + sorted(list(df_source[col_reg].dropna().astype(str).unique())) if col_reg else ["All"]
+    sel_reg = st.selectbox("Select New Regional", opts_reg, key="trk_reg_github_v5")
+
+# Logika Filtering Bertingkat
+df_trk_filtered = df_source.copy()
+if sel_area != "All" and col_area:
+    df_trk_filtered = df_trk_filtered[df_trk_filtered[col_area].astype(str) == sel_area]
+if sel_year != "All" and col_year:
+    df_trk_filtered = df_trk_filtered[df_trk_filtered[col_year].astype(str) == sel_year]
+if sel_pic != "All" and col_pic:
+    df_trk_filtered = df_trk_filtered[df_trk_filtered[col_pic].astype(str) == sel_pic]
+if sel_reg != "All" and col_reg:
+    df_trk_filtered = df_trk_filtered[df_trk_filtered[col_reg].astype(str) == sel_reg]
+
+
+# ------------------------------------------
+# 3. PROSES PIVOT TABLE & FORMULA
+# ------------------------------------------
+def generate_tracking_invoice_table(df_input):
+    df_trk = df_input.copy()
+    df_trk = df_trk.loc[:, ~df_trk.columns.duplicated()].copy()
+
+    col_reg_t = next((c for c in ['new regional', 'Regional', 'regional'] if c in df_trk.columns), 'Regional')
+    col_supp_t = next((c for c in ['Supplier Name', 'Supplier', 'supplier_name'] if c in df_trk.columns), 'Supplier Name')
+    col_site_t = next((c for c in ['Site ID', 'SiteID', 'site_id'] if c in df_trk.columns), 'Site ID')
+    col_inv_no = next((c for c in ['Invoice No.', 'Invoice No', 'Invoice Number'] if c in df_trk.columns), 'Invoice No.')
+    col_m_t = next((c for c in ['Month', 'Payment Month', 'Month Name'] if c in df_trk.columns), 'Month')
+
+    for col_req in [col_reg_t, col_supp_t, col_site_t]:
+        if col_req not in df_trk.columns:
+            df_trk[col_req] = "-"
+        elif isinstance(df_trk[col_req], pd.DataFrame):
+            df_trk[col_req] = df_trk[col_req].iloc[:, 0]
+
+    if col_inv_no not in df_trk.columns:
+        df_trk[col_inv_no] = 1
+    elif isinstance(df_trk[col_inv_no], pd.DataFrame):
+        df_trk[col_inv_no] = df_trk[col_inv_no].iloc[:, 0]
+
+    months_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    
+    month_mapping = {
+        '1': 'Jan', '01': 'Jan', 'january': 'Jan', 'jan': 'Jan',
+        '2': 'Feb', '02': 'Feb', 'february': 'Feb', 'feb': 'Feb',
+        '3': 'Mar', '03': 'Mar', 'march': 'Mar', 'mar': 'Mar',
+        '4': 'Apr', '04': 'Apr', 'april': 'Apr', 'apr': 'Apr',
+        '5': 'May', '05': 'May', 'may': 'May',
+        '6': 'Jun', '06': 'Jun', 'june': 'Jun', 'jun': 'Jun',
+        '7': 'Jul', '07': 'Jul', 'july': 'Jul', 'jul': 'Jul',
+        '8': 'Aug', '08': 'Aug', 'august': 'Aug', 'aug': 'Aug',
+        '9': 'Sep', '09': 'Sep', 'september': 'Sep', 'sep': 'Sep',
+        '10': 'Oct', 'october': 'Oct', 'oct': 'Oct',
+        '11': 'Nov', 'november': 'Nov', 'nov': 'Nov',
+        '12': 'Dec', 'december': 'Dec', 'dec': 'Dec'
+    }
+
+    if col_m_t in df_trk.columns:
+        s_m = df_trk[col_m_t]
+        if isinstance(s_m, pd.DataFrame):
+            s_m = s_m.iloc[:, 0]
+        df_trk['month_clean'] = s_m.astype(str).str.lower().str.strip().map(month_mapping).fillna(s_m.astype(str).str.slice(0, 3).str.title())
+    else:
+        df_trk['month_clean'] = 'Jan'
+
+    df_trk = df_trk[df_trk['month_clean'].isin(months_order)]
+
+    if df_trk.empty:
+        return pd.DataFrame(), col_reg_t, col_supp_t, col_site_t
+
+    index_cols = [col_reg_t, col_supp_t, col_site_t]
+
+    pivot_df = df_trk.pivot_table(
+        index=index_cols,
+        columns='month_clean',
+        values=col_inv_no,
+        aggfunc='count',
+        fill_value=0,
+        observed=True
+    ).reset_index()
+
+    for m in months_order:
+        if m not in pivot_df.columns:
+            pivot_df[m] = 0
+
+    pivot_df = pivot_df[index_cols + months_order]
+
+    for m in months_order:
+        pivot_df[m] = pivot_df[m].map(lambda x: 1 if x > 0 else 0)
+
+    pivot_df['Grand Total'] = pivot_df[months_order].sum(axis=1)
+    pivot_df['Progress'] = (pivot_df['Grand Total'] / 12.0 * 100).round(0)
+    pivot_df['Invoice NY Received'] = pivot_df['Grand Total'].apply(lambda x: max(0, 12 - int(x)))
+
+    return pivot_df, col_reg_t, col_supp_t, col_site_t
+
+
+df_trk_res, c_reg, c_supp, c_site = generate_tracking_invoice_table(df_trk_filtered)
+
+# ------------------------------------------
+# 4. VISUALISASI CHART & RENDER HTML
+# ------------------------------------------
+if not df_trk_res.empty:
+    st.markdown("### 📈 Visualisasi Progress Tracking (%)")
+    
+    total_sites = len(df_trk_res)
+    avg_progress = round(df_trk_res['Progress'].mean(), 1)
+    total_ny_rec = int(df_trk_res['Invoice NY Received'].sum())
+    
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total Site", f"{total_sites} Sites")
+    m2.metric("Rata-Rata Progress", f"{avg_progress}%")
+    m3.metric("Total Invoice NY Received", f"{total_ny_rec} Inv", delta_color="inverse")
+
+    chart_data = df_trk_res[[c_site, 'Progress']].set_index(c_site)
+    st.bar_chart(chart_data)
+
+    st.markdown("---")
+
+    months_headers = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    rows_trk_html = ""
+    
+    for idx, row in df_trk_res.iterrows():
+        m_cells = ""
+        for m in months_headers:
+            val_m = int(row[m])
+            cell_bg = "background-color: #fce4d6; color: #c00000; font-weight: bold;" if val_m == 0 else "text-align: center;"
+            m_cells += f'<td style="{cell_bg}">{val_m}</td>'
+
+        grand_tot = int(row['Grand Total'])
+        prog_pct = int(row['Progress'])
+        ny_rec = int(row['Invoice NY Received'])
+
+        ny_bg = "background-color: #ff0000; color: #ffffff; font-weight: bold;" if ny_rec > 0 else "text-align: center;"
+
+        rows_trk_html += f"""
+        <tr>
+            <td style="text-align: left;">{row[c_reg]}</td>
+            <td style="text-align: left;">{row[c_supp]}</td>
+            <td style="text-align: center;">{row[c_site]}</td>
+            {m_cells}
+            <td style="text-align: center; font-weight: bold;">{grand_tot}</td>
+            <td style="text-align: center; background-color: #e2efda; font-weight: bold; color: #375623;">{prog_pct}%</td>
+            <td style="{ny_bg}">{ny_rec}</td>
+        </tr>
+        """
+
+    full_trk_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: transparent; }}
+        .scroll-container {{
+            max-height: 450px; 
+            overflow-y: auto; 
+            overflow-x: auto;
+            border: 1px solid #d9d9d9;
+        }}
+        .trk-table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000000; }}
+        .trk-table th, .trk-table td {{ border: 1px solid #d9d9d9; padding: 4px 6px; white-space: nowrap; }}
+        .trk-hdr {{ 
+            background-color: #ffffff; 
+            color: #000000; 
+            font-weight: bold; 
+            text-align: center; 
+            vertical-align: middle; 
+            border: 1px solid #000000 !important; 
+            position: sticky; 
+            top: 0; 
+            z-index: 10;
+        }}
+        .trk-hdr-title {{ font-size: 16px; font-weight: bold; text-decoration: underline; padding: 8px 0; border: none; text-align: left; color: #000000; }}
+    </style>
+    </head>
+    <body>
+    <div class="trk-hdr-title">Tracking invoice</div>
+    <div class="scroll-container">
+        <table class="trk-table">
+            <thead>
+                <tr>
+                    <th class="trk-hdr">Regional</th>
+                    <th class="trk-hdr">Supplier Name</th>
+                    <th class="trk-hdr">Site ID</th>
+                    <th class="trk-hdr">Jan</th>
+                    <th class="trk-hdr">Feb</th>
+                    <th class="trk-hdr">Mar</th>
+                    <th class="trk-hdr">Apr</th>
+                    <th class="trk-hdr">May</th>
+                    <th class="trk-hdr">Jun</th>
+                    <th class="trk-hdr">Jul</th>
+                    <th class="trk-hdr">Aug</th>
+                    <th class="trk-hdr">Sep</th>
+                    <th class="trk-hdr">Oct</th>
+                    <th class="trk-hdr">Nov</th>
+                    <th class="trk-hdr">Dec</th>
+                    <th class="trk-hdr">Grand Total</th>
+                    <th class="trk-hdr">Progress</th>
+                    <th class="trk-hdr">Invoice NY Received</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_trk_html}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_trk_html, height=520, scrolling=False)
+else:
+    st.warning("Data Tracking Invoice tidak ditemukan berdasarkan filter yang dipilih.")
