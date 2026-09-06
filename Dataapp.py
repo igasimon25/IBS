@@ -855,42 +855,99 @@ if not df_risk_vat.empty:
         </tr>
         """
 
-    full_html_vat = f"""
+    
+    full_html_risk = f"""
     <!DOCTYPE html>
     <html>
     <head>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
         table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
-        th {{ border: 1px solid #7f7f7f; padding: 6px; text-align: center; font-weight: bold; }}
+        th {{ border: 1px solid #b0b0b0; padding: 6px; text-align: center; font-weight: bold; cursor: pointer; background-color: #d9d9d9; }}
+        th:hover {{ background-color: #c0c0c0; }}
+        td {{ border: 1px solid #d9d9d9; padding: 5px; }}
     </style>
+    <script>
+    function sortTable(n) {{
+        var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+        table = document.getElementById("sortableTable");
+        switching = true;
+        dir = "asc";
+        while (switching) {{
+            switching = false;
+            rows = table.rows;
+            // Mulai dari baris 2 (setelah header bertingkat)
+            for (i = 2; i < (rows.length - 1); i++) {{
+                shouldSwitch = false;
+                x = rows[i].getElementsByTagName("TD")[n];
+                y = rows[i + 1].getElementsByTagName("TD")[n];
+                
+                // Jangan ikutkan baris Grand Total di baris terakhir saat sorting
+                if (rows[i].innerText.includes("Grand Total") || rows[i + 1].innerText.includes("Grand Total")) {{
+                    continue;
+                }}
+                
+                var xVal = x.textContent || x.innerText;
+                var yVal = y.textContent || y.innerText;
+                
+                // Cek apakah angka atau teks
+                var xNum = parseFloat(xVal.replace(/[^0-9.-]+/g,""));
+                var yNum = parseFloat(yVal.replace(/[^0-9.-]+/g,""));
+                
+                if (!isNaN(xNum) && !isNaN(yNum)) {{
+                    if (dir == "asc") {{
+                        if (xNum > yNum) {{ shouldSwitch = true; break; }}
+                    }} else if (dir == "desc") {{
+                        if (xNum < yNum) {{ shouldSwitch = true; break; }}
+                    }}
+                }} else {{
+                    if (dir == "asc") {{
+                        if (xVal.toLowerCase() > yVal.toLowerCase()) {{ shouldSwitch = true; break; }}
+                    }} else if (dir == "desc") {{
+                        if (xVal.toLowerCase() < yVal.toLowerCase()) {{ shouldSwitch = true; break; }}
+                    }}
+                }}
+            }}
+            if (shouldSwitch) {{
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                switching = true;
+                switchcount++;
+            }} else {{
+                if (switchcount == 0 && dir == "asc") {{
+                    dir = "desc";
+                    switching = true;
+                }}
+            }}
+        }}
+    }}
+    </script>
     </head>
     <body>
     <div style="overflow-x: auto; max-height: 480px;">
-        <table>
+        <table id="sortableTable">
             <thead>
                 <tr>
-                    <th rowspan="2" style="background-color: #d9e1f2; width: 12%;">Periode Month</th>
-                    <th colspan="4" style="background-color: #ffc000; color: #000;">Net Amount</th>
-                    <th rowspan="2" style="background-color: #ffff00; width: 16%;">FP Exp Net Amount-VAT(ppn)</th>
-                    <th rowspan="2" style="background-color: #ffff00; width: 14%;">VAT Loss</th>
+                    <th rowspan="2" onclick="sortTable(0)">Periode Month ↕</th>
+                    <th colspan="4" style="background-color: #ffc000;">Net Amount</th>
+                    <th rowspan="2" onclick="sortTable(5)" style="background-color: #ffc000;">FP Exp Net Amount-VAT(ppn) ↕</th>
+                    <th rowspan="2" onclick="sortTable(6)" style="background-color: #ffc000;">VAT Loss ↕</th>
                 </tr>
                 <tr>
-                    <th style="background-color: #ffc000; width: 14%;">Normal</th>
-                    <th style="background-color: #ffc000; width: 14%;">Potential Expired</th>
-                    <th style="background-color: #ffc000; width: 14%;">FP Expired</th>
-                    <th style="background-color: #ffc000; width: 16%;">Total Net Amount</th>
+                    <th onclick="sortTable(1)">Normal ↕</th>
+                    <th onclick="sortTable(2)">Potential Expired ↕</th>
+                    <th onclick="sortTable(3)">FP Expired ↕</th>
+                    <th onclick="sortTable(4)">Total Net Amount ↕</th>
                 </tr>
             </thead>
             <tbody>
-                {rows_html_vat}
+                {rows_html_risk}
             </tbody>
         </table>
     </div>
     </body>
     </html>
     """
-    components.html(full_html_vat, height=500, scrolling=True)
+    components.html(full_html_risk, height=500, scrolling=False)
 
 # ==========================================
 # 12. MANAGEMENT FEE PROCESS SUMMARY
