@@ -723,7 +723,8 @@ if not df_tsel_agent.empty:
     </body>
     </html>
     """
-    components.html(full_html_tsel, height=450, scrolling=True)
+       calc_height = min(750, max(200, (len(df_summary_raw) + 2) * 28))
+    components.html(full_html, height=calc_height, scrolling=True)
 
 # ==========================================
 # 11. RISK VAT HUAWEI SUMMARY
@@ -853,8 +854,9 @@ if not df_risk_vat.empty:
     </body>
     </html>
     """
-    components.html(full_html_vat, height=450, scrolling=True)
 
+    calc_height = min(750, max(200, (len(df_summary_raw) + 2) * 28))
+    components.html(full_html, height=calc_height, scrolling=True)
 # ==========================================
 # 12. MANAGEMENT FEE PROCESS SUMMARY
 # ==========================================
@@ -994,8 +996,8 @@ if not df_manfee.empty:
     </body>
     </html>
     """
-    components.html(full_html_mf, height=450, scrolling=True)
-
+    calc_height = min(750, max(200, (len(df_summary_raw) + 2) * 28))
+    components.html(full_html, height=calc_height, scrolling=True)
 # ==========================================
 # 13. STATUS REJECTION SAP SUMMARY
 # ==========================================
