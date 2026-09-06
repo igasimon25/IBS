@@ -1254,7 +1254,7 @@ else:
 
 
 # ==========================================
-# STATUS TRACKING INV BM (GITHUB READY + NEW REGIONAL FILTER)
+# STATUS TRACKING INV BM (WITH STICKY HEADER)
 # ==========================================
 st.markdown("---")
 st.subheader("📊 Status Tracking Invoice BM")
@@ -1304,19 +1304,19 @@ f_col1, f_col2, f_col3, f_col4 = st.columns(4)
 
 with f_col1:
     opts_area = ["All"] + sorted(list(df_source[col_area].dropna().astype(str).unique())) if col_area else ["All"]
-    sel_area = st.selectbox("Select Area", opts_area, key="trk_area_github_v4")
+    sel_area = st.selectbox("Select Area", opts_area, key="trk_area_github_v5")
 
 with f_col2:
     opts_year = ["All"] + sorted(list(df_source[col_year].dropna().astype(str).unique())) if col_year else ["All"]
-    sel_year = st.selectbox("Select Year", opts_year, key="trk_year_github_v4")
+    sel_year = st.selectbox("Select Year", opts_year, key="trk_year_github_v5")
 
 with f_col3:
     opts_pic = ["All"] + sorted(list(df_source[col_pic].dropna().astype(str).unique())) if col_pic else ["All"]
-    sel_pic = st.selectbox("Select PIC Site", opts_pic, key="trk_pic_github_v4")
+    sel_pic = st.selectbox("Select PIC Site", opts_pic, key="trk_pic_github_v5")
 
 with f_col4:
     opts_reg = ["All"] + sorted(list(df_source[col_reg].dropna().astype(str).unique())) if col_reg else ["All"]
-    sel_reg = st.selectbox("Select New Regional", opts_reg, key="trk_reg_github_v4")
+    sel_reg = st.selectbox("Select New Regional", opts_reg, key="trk_reg_github_v5")
 
 # Logika Filtering Bertingkat
 df_trk_filtered = df_source.copy()
@@ -1401,7 +1401,6 @@ def generate_tracking_invoice_table(df_input):
 
     pivot_df = pivot_df[index_cols + months_order]
 
-    # Menggunakan .map() kompatibel Pandas versi baru di GitHub
     for m in months_order:
         pivot_df[m] = pivot_df[m].map(lambda x: 1 if x > 0 else 0)
 
@@ -1468,15 +1467,31 @@ if not df_trk_res.empty:
     <head>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: transparent; }}
+        .scroll-container {{
+            max-height: 450px; 
+            overflow-y: auto; 
+            overflow-x: auto;
+            border: 1px solid #d9d9d9;
+        }}
         .trk-table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000000; }}
         .trk-table th, .trk-table td {{ border: 1px solid #d9d9d9; padding: 4px 6px; white-space: nowrap; }}
-        .trk-hdr {{ background-color: #ffffff; color: #000000; font-weight: bold; text-align: center; vertical-align: middle; border: 1px solid #000000 !important; }}
+        .trk-hdr {{ 
+            background-color: #ffffff; 
+            color: #000000; 
+            font-weight: bold; 
+            text-align: center; 
+            vertical-align: middle; 
+            border: 1px solid #000000 !important; 
+            position: sticky; 
+            top: 0; 
+            z-index: 10;
+        }}
         .trk-hdr-title {{ font-size: 16px; font-weight: bold; text-decoration: underline; padding: 8px 0; border: none; text-align: left; color: #000000; }}
     </style>
     </head>
     <body>
-    <div style="overflow-x: auto;">
-        <div class="trk-hdr-title">Tracking invoice</div>
+    <div class="trk-hdr-title">Tracking invoice</div>
+    <div class="scroll-container">
         <table class="trk-table">
             <thead>
                 <tr>
@@ -1508,6 +1523,6 @@ if not df_trk_res.empty:
     </body>
     </html>
     """
-    components.html(full_trk_html, height=min(len(df_trk_res) * 28 + 140, 600), scrolling=True)
+    components.html(full_trk_html, height=520, scrolling=False)
 else:
     st.warning("Data Tracking Invoice tidak ditemukan berdasarkan filter yang dipilih.")
