@@ -4,7 +4,15 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
 import re
-
+def get_sort_key(val):
+    """Fungsi helper universal untuk parsing format bulan secara kronologis"""
+    val_str = str(val).strip()
+    dt = pd.to_datetime(val_str, errors='coerce')
+    if pd.isna(dt):
+        dt = pd.to_datetime(val_str, format='%b-%y', errors='coerce')
+    if pd.isna(dt):
+        dt = pd.to_datetime(val_str, format='%b %Y', errors='coerce')
+    return dt if pd.notna(dt) else pd.Timestamp.min
 # ==========================================
 # 1. KONFIGURASI HALAMAN & HEADER
 # ==========================================
