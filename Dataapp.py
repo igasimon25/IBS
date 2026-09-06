@@ -918,7 +918,7 @@ if not df_risk_vat.empty:
     </body>
     </html>
     """
-    components.html(full_html_vat, height=550, scrolling=True)
+    components.html(full_html_vat, height=650, scrolling=True)
 
 # ==========================================
 # 12. MANAGEMENT FEE PROCESS SUMMARY
@@ -1083,7 +1083,7 @@ if not df_manfee.empty:
     </body>
     </html>
     """
-    components.html(full_html_mf, height=550, scrolling=False)
+    components.html(full_html_mf, height=650, scrolling=False)
 
 # ==========================================
 # 13. STATUS REJECTION SAP SUMMARY (DROPDOWN MULTI-SELECT)
