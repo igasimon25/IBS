@@ -16,8 +16,22 @@ def get_sort_key(val):
     if val_str.lower() in ['grand total', '(blank)', 'nan', 'none', '']:
         return pd.Timestamp.max
         
-    # Coba format 'Mon-YY' (misal: oct-24, nov-24, dec-24, jan-25)
+    # Tangani format teks lokal/singkatan (misal: Okt-24, Mac-25, Des-24) dengan normalisasi ke Bahasa Inggris
+    month_map = {
+        'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr', 'may': 'May', 'jun': 'Jun',
+        'jul': 'Jul', 'aug': 'Aug', 'sep': 'Sep', 'oct': 'Oct', 'nov': 'Nov', 'dec': 'Dec',
+        'des': 'Dec', 'mei': 'May', 'agt': 'Aug', 'okt': 'Oct'
+    }
+    
+    for id_m, en_m in month_map.items():
+        if val_str.lower().startswith(id_m):
+            val_str = re.sub(r'^(?i)' + id_m, en_m, val_str)
+            break
+
+    # Coba format 'Mon-YY' atau 'Mon YY' (misal: oct-24, nov 24)
     dt = pd.to_datetime(val_str, format='%b-%y', errors='coerce')
+    if pd.isna(dt):
+        dt = pd.to_datetime(val_str, format='%b %y', errors='coerce')
     
     # Jika gagal, coba format 'Mon YYYY'
     if pd.isna(dt):
