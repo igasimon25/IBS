@@ -4,6 +4,10 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
 import re
+
+# ==========================================
+# GLOBAL HELPER: PENGURUTAN KRONOLOGIS BULAN
+# ==========================================
 def get_sort_key(val):
     """Fungsi helper universal untuk parsing format bulan secara kronologis"""
     val_str = str(val).strip()
@@ -13,6 +17,7 @@ def get_sort_key(val):
     if pd.isna(dt):
         dt = pd.to_datetime(val_str, format='%b %Y', errors='coerce')
     return dt if pd.notna(dt) else pd.Timestamp.min
+
 # ==========================================
 # 1. KONFIGURASI HALAMAN & HEADER
 # ==========================================
@@ -24,7 +29,6 @@ st.set_page_config(
 
 st.title("📊 DASHBOARD POB IBS BUILDING MANAGEMENT")
 st.markdown("---")
-
 # ==========================================
 # 2. BACA DATA GOOGLE SHEETS & DATA CLEANING
 # ==========================================
