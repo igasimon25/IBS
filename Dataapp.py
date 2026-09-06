@@ -360,7 +360,7 @@ html_content = f"""
 </html>
 """
 
-components.html(html_content, height=400, scrolling=False)
+components.html(html_content, height=550, scrolling=False)
 
 st.markdown("---")
 
@@ -587,7 +587,7 @@ if not df_summary_raw.empty:
     </body>
     </html>
     """
-    components.html(full_html, height=350, scrolling=True)
+    components.html(full_html, height=550, scrolling=True)
 
 # ==========================================
 # 10. REIMBURSEMENT SUMMARY TO TSEL & AGENT
@@ -720,7 +720,7 @@ if not df_tsel_agent.empty:
     </body>
     </html>
     """
-    components.html(full_html_tsel, height=450, scrolling=True)
+    components.html(full_html_tsel, height=550, scrolling=True)
 
 def generate_risk_vat_summary(df):
     df_calc = df.copy()
