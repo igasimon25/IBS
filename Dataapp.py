@@ -1084,3 +1084,131 @@ if not df_manfee.empty:
     </html>
     """
     components.html(full_html_mf, height=480, scrolling=True)
+
+# ==========================================
+# 13. STATUS REJECTION SAP SUMMARY
+# ==========================================
+st.markdown("---")
+st.subheader("❌ Status Rejection SAP")
+
+def generate_rejection_sap_summary(df):
+    df_calc = df.copy()
+
+    # Validasi Kolom Utama
+    col_reg = 'new regional' if 'new regional' in df_calc.columns else ('Regional' if 'Regional' in df_calc.columns else None)
+    col_inv_type = 'IBS Invoice Type' if 'IBS Invoice Type' in df_calc.columns else ('Invoice Type' if 'Invoice Type' in df_calc.columns else None)
+    col_inv_no = 'Invoice No' if 'Invoice No' in df_calc.columns else ('No Invoice' if 'No Invoice' in df_calc.columns else None)
+    col_sap = 'StatusSAP' if 'StatusSAP' in df_calc.columns else ('Status SAP' if 'Status SAP' in df_calc.columns else None)
+
+    if not col_reg or not col_inv_type or not col_sap:
+        return pd.DataFrame(), 0, 0.0
+
+    # Cleaning & Casting NET AMOUNT
+    if 'NET AMOUNT' in df_calc.columns:
+        df_calc['NET AMOUNT'] = (
+            df_calc['NET AMOUNT']
+            .astype(str)
+            .str.replace(r'[^\d.-]', '', regex=True)
+            .replace('', '0')
+        )
+        df_calc['NET AMOUNT'] = pd.to_numeric(df_calc['NET AMOUNT'], errors='coerce').fillna(0.0)
+    else:
+        df_calc['NET AMOUNT'] = 0.0
+
+    # Filter khusus Status SAP == "REJECTED"
+    sap_series = df_calc[col_sap].astype(str).str.upper().str.strip()
+    df_rejected = df_calc[sap_series == 'REJECTED'].copy()
+
+    if df_rejected.empty:
+        return pd.DataFrame(), 0, 0.0
+
+    # Groupby berdasarkan new regional dan IBS Invoice Type
+    summary = df_rejected.groupby([col_reg, col_inv_type], as_index=False, dropna=False).agg(
+        Count_of_Invoice_No=(col_inv_no, 'count') if col_inv_no else (col_reg, 'count'),
+        Sum_of_NET_AMOUNT=('NET AMOUNT', 'sum')
+    )
+
+    # Urutkan berdasarkan regional dan invoice type
+    summary = summary.sort_values(by=[col_reg, col_inv_type]).reset_index(drop=True)
+
+    total_count = int(summary['Count_of_Invoice_No'].sum())
+    total_net = float(summary['Sum_of_NET_AMOUNT'].sum())
+
+    return summary, col_reg, col_inv_type, total_count, total_net
+
+df_reject_summary, col_reg_name, col_type_name, total_inv_count, total_net_amt = generate_rejection_sap_summary(df_filtered)
+
+if not df_reject_summary.empty:
+    # Metrik Ringkasan di atas Tabel (Mirip Tampilan Gambar)
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; border-radius: 5px;">
+            <p style="margin: 0; font-size: 12px; color: #6c757d; font-weight: bold;">Total Count of Invoice No</p>
+            <h3 style="margin: 0; color: #212529;">{total_inv_count:,}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col_m2:
+        formatted_total_net = f"Rp {total_net_amt:,.0f}".replace(",", ".")
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; border-radius: 5px;">
+            <p style="margin: 0; font-size: 12px; color: #6c757d; font-weight: bold;">Total NET AMOUNT</p>
+            <h3 style="margin: 0; color: #212529;">{formatted_total_net}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Render Tabel HTML
+    rows_html_reject = ""
+    for idx, row in df_reject_summary.iterrows():
+        reg_val = row[col_reg_name]
+        type_val = row[col_type_name]
+        cnt_val = row['Count_of_Invoice_No']
+        net_val = row['Sum_of_NET_AMOUNT']
+        
+        formatted_net = f"Rp {net_val:,.0f}".replace(",", ".")
+        row_bg = "#ffffff" if idx % 2 == 0 else "#f9f9f9"
+
+        rows_html_reject += f"""
+        <tr style="background-color: {row_bg};">
+            <td style="border: 1px solid #d9d9d9; padding: 6px; text-align: left;">{reg_val}</td>
+            <td style="border: 1px solid #d9d9d9; padding: 6px; text-align: center;">{type_val}</td>
+            <td style="border: 1px solid #d9d9d9; padding: 6px; text-align: center;">{cnt_val:,}</td>
+            <td style="border: 1px solid #d9d9d9; padding: 6px; text-align: right;">{formatted_net}</td>
+        </tr>
+        """
+
+    full_html_reject = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
+        th {{ border: 1px solid #b0b0b0; padding: 8px; text-align: center; background-color: #f2f2f2; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+    <div style="overflow-x: auto; max-height: 450px;">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 35%;">new regional</th>
+                    <th style="width: 15%;">IBS Invoice Type</th>
+                    <th style="width: 20%;">Count of Invoice No</th>
+                    <th style="width: 30%;">Sum of NET AMOUNT</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html_reject}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_html_reject, height=400, scrolling=True)
+else:
+    st.info("Tidak ada data dengan Status SAP 'Rejected' yang sesuai dengan filter saat ini.")
