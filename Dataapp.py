@@ -1125,8 +1125,7 @@ if not df_manfee.empty:
     """
     
 components.html(full_trk_html, height=520, scrolling=False)
-else:
-    st.warning("Data Tracking Invoice tidak ditemukan berdasarkan filter yang dipilih.")
+
 
 # ==========================================
 # 13. STATUS REJECTION SAP SUMMARY (DROPDOWN MULTI-SELECT)
