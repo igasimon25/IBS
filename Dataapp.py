@@ -722,12 +722,6 @@ if not df_tsel_agent.empty:
     """
     components.html(full_html_tsel, height=450, scrolling=True)
 
-# ==========================================
-# 11. RISK VAT HUAWEI SUMMARY
-# ==========================================
-st.markdown("---")
-st.subheader("⚠️ Risk VAT Huawei Summary")
-
 def generate_risk_vat_summary(df):
     df_calc = df.copy()
 
@@ -743,18 +737,29 @@ def generate_risk_vat_summary(df):
         else:
             df_calc['PPN'] = 0.0
 
+    # Clean & Convert Kolom Numerik ke Float (Aman dari String/Format Rupiah)
+    for col in ['NET AMOUNT', 'PPN']:
+        if col in df_calc.columns:
+            df_calc[col] = (
+                df_calc[col]
+                .astype(str)
+                .str.replace(r'[^\d.-]', '', regex=True)
+                .replace('', '0')
+            )
+            df_calc[col] = pd.to_numeric(df_calc[col], errors='coerce').fillna(0.0)
+
     col_fp = 'Status FP' if 'Status FP' in df_calc.columns else 'Status_FP'
     fp_series = df_calc[col_fp].astype(str).str.upper().str.strip() if col_fp in df_calc.columns else pd.Series('', index=df_calc.index)
 
     # Break Down Net Amount Berdasarkan Status FP
-    df_calc['NET_NORMAL'] = np.where(fp_series == 'NORMAL', df_calc['NET AMOUNT'], 0)
-    df_calc['NET_POTENTIAL'] = np.where(fp_series.isin(['POTENTIAL EXPIRED', 'POTENTIAL EXPIRED ']), df_calc['NET AMOUNT'], 0)
-    df_calc['NET_EXPIRED'] = np.where(fp_series == 'FP EXPIRED', df_calc['NET AMOUNT'], 0)
+    df_calc['NET_NORMAL'] = np.where(fp_series == 'NORMAL', df_calc['NET AMOUNT'], 0.0)
+    df_calc['NET_POTENTIAL'] = np.where(fp_series.isin(['POTENTIAL EXPIRED', 'POTENTIAL EXPIRED ']), df_calc['NET AMOUNT'], 0.0)
+    df_calc['NET_EXPIRED'] = np.where(fp_series == 'FP EXPIRED', df_calc['NET AMOUNT'], 0.0)
 
-    # FP Expired Specific Metrics (FP Exp Net Amount-VAT(ppn) & VAT Loss)
-    mask_expired = fp_series == 'FP EXPIRED'
-    df_calc['FP_EXP_NET_MINUS_VAT'] = np.where(mask_expired, df_calc['NET AMOUNT'] - df_calc['PPN'], 0)
-    df_calc['VAT_LOSS'] = np.where(mask_expired, df_calc['PPN'], 0)
+    # FP Expired Specific Metrics
+    mask_expired = (fp_series == 'FP EXPIRED')
+    df_calc['FP_EXP_NET_MINUS_VAT'] = np.where(mask_expired, df_calc['NET AMOUNT'] - df_calc['PPN'], 0.0)
+    df_calc['VAT_LOSS'] = np.where(mask_expired, df_calc['PPN'], 0.0)
 
     # Groupby Periode Month
     summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
@@ -778,72 +783,3 @@ def generate_risk_vat_summary(df):
     }])
 
     return pd.concat([summary, grand_total], ignore_index=True), col_m
-
-df_risk_vat, col_m_vat = generate_risk_vat_summary(df_filtered)
-
-if not df_risk_vat.empty:
-    def fmt_rp_vat(val):
-        if abs(val) < 1e-9:
-            return "Rp -"
-        elif val < 0:
-            return f"-Rp {abs(val):,.0f}".replace(",", ".")
-        else:
-            return f"Rp {val:,.0f}".replace(",", ".")
-
-    rows_html_vat = ""
-    for idx, row in df_risk_vat.iterrows():
-        val_m = row[col_m_vat]
-        is_total = (val_m == 'Grand Total')
-        if pd.isna(val_m) or str(val_m).strip().lower() in ['nan', 'none', '']:
-            val_m = "(blank)"
-
-        row_style = "background-color: #b4c6e7; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #f2f2f2;")
-
-        rows_html_vat += f"""
-        <tr style="{row_style}">
-            <td style="text-align: center; border: 1px solid #7f7f7f; padding: 5px;">{val_m}</td>
-            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['NET_NORMAL'])}</td>
-            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['NET_POTENTIAL'])}</td>
-            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['NET_EXPIRED'])}</td>
-            <td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['NET AMOUNT'])}</td>
-            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['FP_EXP_NET_MINUS_VAT'])}</td>
-            <td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['VAT_LOSS'])}</td>
-        </tr>
-        """
-
-    full_html_vat = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
-        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
-        th {{ border: 1px solid #7f7f7f; padding: 6px; text-align: center; font-weight: bold; }}
-    </style>
-    </head>
-    <body>
-    <div style="overflow-x: auto; max-height: 480px;">
-        <table>
-            <thead>
-                <tr>
-                    <th rowspan="2" style="background-color: #d9e1f2; width: 12%;">Periode Month</th>
-                    <th colspan="4" style="background-color: #ffc000; color: #000;">Net Amount</th>
-                    <th rowspan="2" style="background-color: #ffff00; width: 16%;">FP Exp Net Amount-VAT(ppn)</th>
-                    <th rowspan="2" style="background-color: #ffff00; width: 14%;">VAT Loss</th>
-                </tr>
-                <tr>
-                    <th style="background-color: #ffc000; width: 14%;">Normal</th>
-                    <th style="background-color: #ffc000; width: 14%;">Potential Expired</th>
-                    <th style="background-color: #ffc000; width: 14%;">FP Expired</th>
-                    <th style="background-color: #ffc000; width: 16%;">Total Net Amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows_html_vat}
-            </tbody>
-        </table>
-    </div>
-    </body>
-    </html>
-    """
-    components.html(full_html_vat, height=450, scrolling=True)
