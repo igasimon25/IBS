@@ -1086,7 +1086,7 @@ if not df_manfee.empty:
     components.html(full_html_mf, height=480, scrolling=True)
 
 # ==========================================
-# 13. STATUS REJECTION SAP SUMMARY (WITH PIC SITE FILTER)
+# 13. STATUS REJECTION SAP SUMMARY (DROPDOWN MULTI-SELECT)
 # ==========================================
 st.markdown("---")
 st.subheader("❌ Status Rejection SAP")
@@ -1100,24 +1100,37 @@ col_pic = next((c for c in col_pic_candidates if c in df_filtered.columns), None
 
 df_rej_filtered = df_filtered.copy()
 
-# Subheader Filter Khusus Rejection SAP (Area & PIC Site)
-if col_area or col_pic:
-    st.markdown("**Filter Rejection SAP**")
-    f_col1, f_col2 = st.columns(2)
-    
-    with f_col1:
-        if col_area:
-            unique_areas = sorted(df_filtered[col_area].dropna().astype(str).unique())
-            selected_areas = st.multiselect("Area (Khusus SAP)", options=unique_areas, default=unique_areas, key="rej_area_filter")
-            if selected_areas:
-                df_rej_filtered = df_rej_filtered[df_rej_filtered[col_area].astype(str).isin(selected_areas)]
-                
-    with f_col2:
-        if col_pic:
-            unique_pics = sorted(df_filtered[col_pic].dropna().astype(str).unique())
-            selected_pics = st.multiselect("PIC Site (Khusus SAP)", options=unique_pics, default=unique_pics, key="rej_pic_filter")
-            if selected_pics:
-                df_rej_filtered = df_rej_filtered[df_rej_filtered[col_pic].astype(str).isin(selected_pics)]
+# Filter Subheader Menggunakan Dropdown Multi-select Streamlit
+st.markdown("**Filter Rejection SAP**")
+f_col1, f_col2 = st.columns(2)
+
+with f_col1:
+    if col_area:
+        unique_areas = sorted(df_filtered[col_area].dropna().astype(str).unique())
+        selected_areas = st.multiselect(
+            "Area (Khusus SAP)", 
+            options=unique_areas, 
+            default=unique_areas, 
+            key="rej_area_multiselect"
+        )
+        if selected_areas:
+            df_rej_filtered = df_rej_filtered[df_rej_filtered[col_area].astype(str).isin(selected_areas)]
+        else:
+            df_rej_filtered = df_rej_filtered.iloc[0:0] # Kosongkan jika tidak ada yang dipilih
+
+with f_col2:
+    if col_pic:
+        unique_pics = sorted(df_filtered[col_pic].dropna().astype(str).unique())
+        selected_pics = st.multiselect(
+            "PIC Site (Khusus SAP)", 
+            options=unique_pics, 
+            default=unique_pics, 
+            key="rej_pic_multiselect"
+        )
+        if selected_pics:
+            df_rej_filtered = df_rej_filtered[df_rej_filtered[col_pic].astype(str).isin(selected_pics)]
+        else:
+            df_rej_filtered = df_rej_filtered.iloc[0:0]
 
 def generate_rejection_sap_summary(df):
     df_calc = df.copy()
@@ -1237,4 +1250,4 @@ if not df_reject_summary.empty and col_reg_name:
     """
     components.html(full_html_reject, height=400, scrolling=True)
 else:
-    st.info("Tidak ada data dengan Status SAP 'Rejected' yang sesuai dengan filter saat ini.")
+    st.info("Tidak ada data dengan Status SAP 'Rejected' yang sesuai dengan pilihan filter saat ini.")
