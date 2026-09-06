@@ -5,30 +5,24 @@ import plotly.graph_objects as go
 import streamlit.components.v1 as components
 import re
 
-# ==========================================
-# GLOBAL HELPER: PENGURUTAN KRONOLOGIS BULAN
-# ==========================================
-def get_sort_key(val):
-    """Fungsi helper universal untuk parsing format bulan secara kronologis (dari Oktober 2024 ke atas)"""
-    val_str = str(val).strip()
-    
-    # Letakkan Grand Total atau data kosong di urutan paling akhir
-    if val_str.lower() in ['grand total', '(blank)', 'nan', 'none', '']:
-        return pd.Timestamp.max
-        
-    # Coba format 'Mon-YY' (misal: oct-24, nov-24, dec-24, jan-25)
-    dt = pd.to_datetime(val_str, format='%b-%y', errors='coerce')
-    
-    # Jika gagal, coba format 'Mon YYYY'
-    if pd.isna(dt):
-        dt = pd.to_datetime(val_str, format='%b %Y', errors='coerce')
-        
-    # Jika masih gagal, coba deteksi otomatis umum
-    if pd.isna(dt):
-        dt = pd.to_datetime(val_str, errors='coerce')
-        
-    return dt if pd.notna(dt) else pd.Timestamp.min
+# 1. Groupby data seperti biasa
+    summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
+        'NET AMOUNT': 'sum',
+        # ... (kolom agregasi lainnya) ...
+    })
 
+    # 2. Terapkan pemetaan sort_key dan urutkan secara ASCENDING (dari yang lama ke baru)
+    summary['_sort_key'] = summary[col_m].apply(get_sort_key)
+    summary = summary.sort_values(by='_sort_key', ascending=True).drop(columns=['_sort_key'])
+
+    # 3. Baru buat Grand Total SETELAH data diurutkan
+    grand_total = pd.DataFrame([{
+        col_m: 'Grand Total',
+        # ... (nilai total) ...
+    }])
+
+    # 4. Gabungkan
+    full_summary = pd.concat([summary, grand_total], ignore_index=True)
 # ==========================================
 # 1. KONFIGURASI HALAMAN & HEADER
 # ==========================================
