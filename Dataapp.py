@@ -70,8 +70,6 @@ def load_data():
             mapping[col] = 'Area'
         elif c_upper == 'NEW REGIONAL':
             mapping[col] = 'new regional'
-        elif c_upper in ['PAYMENT MONTH', 'MONTH', 'PERIODE MONTH']:
-            mapping[col] = 'Payment Month'
 
     df = df.rename(columns=mapping)
     df = df.loc[:, ~df.columns.duplicated(keep='first')].copy()
@@ -101,29 +99,6 @@ except Exception as e:
 df_filtered = df_raw.copy()
 
 # ==========================================
-# FUNGSI HELPER: URUTKAN PAYMENT MONTH KRONOLOGIS
-# ==========================================
-def sort_payment_months(month_list):
-    """Mengurutkan list bulan secara kronologis (misal: Oct 2024, Nov 2024, ...)"""
-    valid_months = [m for m in month_list if pd.notna(m) and str(m).lower() not in ['nan', 'none', '', 'grand total', '(blank)']]
-    
-    # Coba konversi ke datetime untuk sorting yang akurat
-    def parse_date(val):
-        val_str = str(val).strip()
-        # Coba berbagai format umum (misal: 'Oct 2024', 'October 2024', '2024-10', dll)
-        dt = pd.to_datetime(val_str, errors='coerce')
-        if pd.isna(dt):
-            # Fallback jika format teks singkat seperti 'Oct-24' atau 'Oct 24'
-            dt = pd.to_datetime(val_str, format='%b %Y', errors='coerce')
-        if pd.isna(dt):
-            dt = pd.to_datetime(val_str, format='%B %Y', errors='coerce')
-        return dt if pd.notna(dt) else pd.Timestamp.min
-
-    # Sort berdasarkan objek datetime asli
-    sorted_months = sorted(list(set(valid_months)), key=parse_date)
-    return sorted_months
-
-# ==========================================
 # 3. SIDEBAR CONTROL & GLOBAL FILTERS
 # ==========================================
 st.sidebar.header("🔍 Global Filters")
@@ -137,20 +112,17 @@ if 'Area' in df_raw.columns:
     if selected_area != "(All)":
         df_filtered = df_filtered[df_filtered['Area'] == selected_area]
 
-# Filter Payment Month (Urut Kronologis)
-col_month = 'Payment Month' if 'Payment Month' in df_filtered.columns else None
+# Filter Payment Month
+col_month = 'Payment Month' if 'Payment Month' in df_filtered.columns else ('Month' if 'Month' in df_filtered.columns else None)
 if col_month and col_month in df_filtered.columns:
-    raw_months = df_filtered[col_month].dropna().unique().tolist()
-    sorted_months_list = sort_payment_months(raw_months)
-    list_month = ["(All Months)"] + [str(x) for x in sorted_months_list]
-    
+    list_month = ["(All Months)"] + [str(x) for x in df_filtered[col_month].dropna().unique().tolist() if str(x).lower() not in ['nan', 'none', '']]
     selected_month = st.sidebar.selectbox("Payment Month Filter", options=list_month, index=0)
     if selected_month != "(All Months)":
         df_filtered = df_filtered[df_filtered[col_month].astype(str) == selected_month]
 
 # Filter New Regional
 if 'new regional' in df_filtered.columns:
-    list_reg = ["(All Regionals)"] + sorted([str(x) for x in df_filtered['new regional'].dropna().unique().tolist() if str(x).lower() not in ['nan', 'none', '']])
+    list_reg = ["(All Regionals)"] + [str(x) for x in df_filtered['new regional'].dropna().unique().tolist() if str(x).lower() not in ['nan', 'none', '']]
     selected_reg = st.sidebar.selectbox("New Regional Filter", options=list_reg, index=0)
     if selected_reg != "(All Regionals)":
         df_filtered = df_filtered[df_filtered['new regional'].astype(str) == selected_reg]
@@ -323,6 +295,9 @@ html_content = f"""
     .sla-label {{ font-size: 10px; font-weight: bold; color: #555; margin-top: 6px; }}
     .arrow-right {{ font-size: 20px; color: #1f497d; font-weight: bold; margin-top: 45px; }}
     .arrow-down {{ font-size: 22px; color: #1f497d; font-weight: bold; text-align: right; padding-right: 40px; margin-top: -10px; margin-bottom: -10px; }}
+    .legend-container {{ display: flex; justify-content: flex-end; gap: 15px; margin-top: 20px; }}
+    .legend-item {{ display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: bold; color: #333; }}
+    .legend-box {{ width: 30px; height: 14px; border-radius: 3px; border: 1px solid #ccc; }}
 </style>
 </head>
 <body>
@@ -470,7 +445,7 @@ if col_inv_agent in df_raw.columns:
 col_reg, col_status_sap, col_net_amt = 'new regional', 'StatusSAP', 'NET AMOUNT'
 
 if col_reg in df_inv_reg.columns and col_status_sap in df_inv_reg.columns and col_net_amt in df_inv_reg.columns:
-    available_regionals = sorted(df_inv_reg[col_reg].dropna().unique().tolist())
+    available_regionals = df_inv_reg[col_reg].dropna().unique().tolist()
     num_cols = 3
     cols = st.columns(num_cols)
     
@@ -526,8 +501,8 @@ def generate_reimbursement_summary_table(df):
     else:
         df_calc['Amount SAP Filtered'] = df_calc['Amount SAP']
 
-    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else None
-    if not col_m or col_m not in df_calc.columns:
+    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
+    if col_m not in df_calc.columns:
         return pd.DataFrame(), col_m
 
     summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
@@ -537,17 +512,8 @@ def generate_reimbursement_summary_table(df):
         'Amount Paid': 'sum'
     })
 
-   # --- TAMBAHKAN LOGIKA SORTING DI SINI ---
-    def get_sort_key(val):
-        dt = pd.to_datetime(str(val), errors='coerce')
-        if pd.isna(dt):
-            dt = pd.to_datetime(str(val), format='%b-%y', errors='coerce')
-        if pd.isna(dt):
-            dt = pd.to_datetime(str(val), format='%b %Y', errors='coerce')
-        return dt if pd.notna(dt) else pd.Timestamp.min
+    summary['GAP'] = summary['NET AMOUNT'] - summary['Amount Paid Based on Setoff Data']
 
-    summary['_sort_key'] = summary[col_m].apply(get_sort_key)
-    summary = summary.sort_values('_sort_key').drop(columns=['_sort_key'])
     grand_total = pd.DataFrame([{
         col_m: 'Grand Total',
         'NET AMOUNT': summary['NET AMOUNT'].sum(),
@@ -632,22 +598,27 @@ st.subheader("📊 Reimbursement Summary to TSEL & Agent")
 def generate_tsel_agent_summary(df):
     df_calc = df.copy()
     
-    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else None
-    if not col_m or col_m not in df_calc.columns or 'NET AMOUNT' not in df_calc.columns:
+    # Deteksi Kolom Bulan
+    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
+    if col_m not in df_calc.columns or 'NET AMOUNT' not in df_calc.columns:
         return pd.DataFrame(), col_m
 
+    # Standardisasi String Kolom
     col_inv = 'Invoice Agent' if 'Invoice Agent' in df_calc.columns else 'Invoice Agent Status'
-    col_dn = 'Status Reimburse Actual' if 'Status Reimburse Actual' in df_calc.columns else 'Status Reimburse'
+    col_dn = 'Status Reimburse Actual' if 'Status Reimburse Actual' in df_calc.columns else ('DN HW' if 'DN HW' in df_calc.columns else 'Status Reimburse')
 
+    # Status Conditions
     inv_series = df_calc[col_inv].astype(str).str.upper().str.strip() if col_inv in df_calc.columns else pd.Series('', index=df_calc.index)
     dn_series = df_calc[col_dn].astype(str).str.upper().str.strip() if col_dn in df_calc.columns else pd.Series('', index=df_calc.index)
 
+    # Filtering Logic per Row
     df_calc['INV_DONE'] = np.where(inv_series == 'INVOICE DONE', df_calc['NET AMOUNT'], 0)
     df_calc['INV_NY'] = np.where(inv_series != 'INVOICE DONE', df_calc['NET AMOUNT'], 0)
 
     df_calc['DN_DONE'] = np.where(dn_series.isin(['PAID', 'DN ISSUED']), df_calc['NET AMOUNT'], 0)
     df_calc['DN_NY'] = np.where(~dn_series.isin(['PAID', 'DN ISSUED']), df_calc['NET AMOUNT'], 0)
 
+    # Groupby Month
     summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
         'NET AMOUNT': 'sum',
         'INV_DONE': 'sum',
@@ -656,21 +627,7 @@ def generate_tsel_agent_summary(df):
         'DN_NY': 'sum'
     })
 
-    # Urutkan berdasarkan Payment Month secara kronologis
-    if not summary.empty:
-        valid_summary = summary.copy()
-        def get_sort_key(val):
-            dt = pd.to_datetime(str(val), errors='coerce')
-            if pd.isna(dt):
-                dt = pd.to_datetime(str(val), format='%b %Y', errors='coerce')
-            if pd.isna(dt):
-                dt = pd.to_datetime(str(val), format='%B %Y', errors='coerce')
-            return dt if pd.notna(dt) else pd.Timestamp.min
-
-        valid_summary['_sort_key'] = valid_summary[col_m].apply(get_sort_key)
-        valid_summary = valid_summary.sort_values('_sort_key').drop(columns=['_sort_key'])
-        summary = valid_summary
-
+    # Total Row
     grand_total = pd.DataFrame([{
         col_m: 'Grand Total',
         'NET AMOUNT': summary['NET AMOUNT'].sum(),
@@ -682,6 +639,7 @@ def generate_tsel_agent_summary(df):
 
     full_summary = pd.concat([summary, grand_total], ignore_index=True)
 
+    # Formulas % Done
     full_summary['PCT_TSEL'] = np.where(full_summary['NET AMOUNT'] > 0, (full_summary['INV_DONE'] / full_summary['NET AMOUNT']) * 100, 0.0)
     full_summary['PCT_AGENT'] = np.where(full_summary['NET AMOUNT'] > 0, (full_summary['DN_DONE'] / full_summary['NET AMOUNT']) * 100, 0.0)
 
@@ -731,26 +689,27 @@ if not df_tsel_agent.empty:
     <style>
         body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
         table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
-        th {{ border: 1px solid #d9d9d9; padding: 6px; text-align: center; font-weight: bold; }}
+        th {{ border: 1px solid #b0b0b0; padding: 6px; text-align: center; font-weight: bold; }}
     </style>
     </head>
     <body>
-    <div style="overflow-x: auto;">
+    <div style="overflow-x: auto; max-height: 480px;">
         <table>
             <thead>
                 <tr>
-                    <th style="background-color: #d9e1f2; width: 12%;" rowspan="2">Payment Month</th>
-                    <th style="background-color: #b4c6e7;" rowspan="2">NET AMOUNT</th>
-                    <th style="background-color: #f8cbad;" colspan="3">Reimbursement to TSEL</th>
-                    <th style="background-color: #c6efce;" colspan="3">Reimbursement to Agent</th>
+                    <th rowspan="2" style="background-color: #d9d9d9; width: 10%;">Periode Month</th>
+                    <th rowspan="2" style="background-color: #d9d9d9; width: 13%;">NET AMOUNT</th>
+                    <th colspan="3" style="background-color: #f8c2a6; color: #000;">Reimbursement to TSEL</th>
+                    <th colspan="3" style="background-color: #a9d08e; color: #000;">Reimbursement to Agent</th>
                 </tr>
                 <tr>
-                    <th style="background-color: #fce4d6;">Done</th>
-                    <th style="background-color: #fce4d6;">Not Yet</th>
-                    <th style="background-color: #fce4d6;">% Done</th>
-                    <th style="background-color: #e2efda;">Done</th>
-                    <th style="background-color: #e2efda;">Not Yet</th>
-                    <th style="background-color: #e2efda;">% Done</th>
+                    <th style="background-color: #fce4d6; width: 13%;">INV. DONE</th>
+                    <th style="background-color: #fce4d6; width: 13%;">INV. NY</th>
+                    <th style="background-color: #f8c2a6; width: 8%;">% Done</th>
+                    
+                    <th style="background-color: #e2efda; width: 13%;">DebitNote DONE</th>
+                    <th style="background-color: #e2efda; width: 13%;">DebitNote NY</th>
+                    <th style="background-color: #a9d08e; width: 8%;">% Done</th>
                 </tr>
             </thead>
             <tbody>
@@ -761,9 +720,70 @@ if not df_tsel_agent.empty:
     </body>
     </html>
     """
-    components.html(full_html_tsel, height=400, scrolling=True)
+    components.html(full_html_tsel, height=550, scrolling=True)
 
-    # ==========================================
+def generate_risk_vat_summary(df):
+    df_calc = df.copy()
+
+    # Deteksi Kolom Bulan
+    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
+    if col_m not in df_calc.columns or 'NET AMOUNT' not in df_calc.columns:
+        return pd.DataFrame(), col_m
+
+    # Pastikan Kolom PPN Ada
+    if 'PPN' not in df_calc.columns:
+        if 'VAT Amount' in df_calc.columns:
+            df_calc['PPN'] = df_calc['VAT Amount']
+        else:
+            df_calc['PPN'] = 0.0
+
+    # Clean & Convert Kolom Numerik ke Float (Aman dari String/Format Rupiah)
+    for col in ['NET AMOUNT', 'PPN']:
+        if col in df_calc.columns:
+            df_calc[col] = (
+                df_calc[col]
+                .astype(str)
+                .str.replace(r'[^\d.-]', '', regex=True)
+                .replace('', '0')
+            )
+            df_calc[col] = pd.to_numeric(df_calc[col], errors='coerce').fillna(0.0)
+
+    col_fp = 'Status FP' if 'Status FP' in df_calc.columns else 'Status_FP'
+    fp_series = df_calc[col_fp].astype(str).str.upper().str.strip() if col_fp in df_calc.columns else pd.Series('', index=df_calc.index)
+
+    # Break Down Net Amount Berdasarkan Status FP
+    df_calc['NET_NORMAL'] = np.where(fp_series == 'NORMAL', df_calc['NET AMOUNT'], 0.0)
+    df_calc['NET_POTENTIAL'] = np.where(fp_series.isin(['POTENTIAL EXPIRED', 'POTENTIAL EXPIRED ']), df_calc['NET AMOUNT'], 0.0)
+    df_calc['NET_EXPIRED'] = np.where(fp_series == 'FP EXPIRED', df_calc['NET AMOUNT'], 0.0)
+
+    # FP Expired Specific Metrics
+    mask_expired = (fp_series == 'FP EXPIRED')
+    df_calc['FP_EXP_NET_MINUS_VAT'] = np.where(mask_expired, df_calc['NET AMOUNT'] - df_calc['PPN'], 0.0)
+    df_calc['VAT_LOSS'] = np.where(mask_expired, df_calc['PPN'], 0.0)
+
+    # Groupby Periode Month
+    summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
+        'NET_NORMAL': 'sum',
+        'NET_POTENTIAL': 'sum',
+        'NET_EXPIRED': 'sum',
+        'NET AMOUNT': 'sum',
+        'FP_EXP_NET_MINUS_VAT': 'sum',
+        'VAT_LOSS': 'sum'
+    })
+
+    # Grand Total Row
+    grand_total = pd.DataFrame([{
+        col_m: 'Grand Total',
+        'NET_NORMAL': summary['NET_NORMAL'].sum(),
+        'NET_POTENTIAL': summary['NET_POTENTIAL'].sum(),
+        'NET_EXPIRED': summary['NET_EXPIRED'].sum(),
+        'NET AMOUNT': summary['NET AMOUNT'].sum(),
+        'FP_EXP_NET_MINUS_VAT': summary['FP_EXP_NET_MINUS_VAT'].sum(),
+        'VAT_LOSS': summary['VAT_LOSS'].sum()
+    }])
+
+    return pd.concat([summary, grand_total], ignore_index=True), col_m
+# ==========================================
 # 11. RISK VAT HUAWEI SUMMARY
 # ==========================================
 st.markdown("---")
