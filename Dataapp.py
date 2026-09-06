@@ -9,13 +9,24 @@ import re
 # GLOBAL HELPER: PENGURUTAN KRONOLOGIS BULAN
 # ==========================================
 def get_sort_key(val):
-    """Fungsi helper universal untuk parsing format bulan secara kronologis"""
+    """Fungsi helper universal untuk parsing format bulan secara kronologis (dari Oktober 2024 ke atas)"""
     val_str = str(val).strip()
-    dt = pd.to_datetime(val_str, errors='coerce')
-    if pd.isna(dt):
-        dt = pd.to_datetime(val_str, format='%b-%y', errors='coerce')
+    
+    # Letakkan Grand Total atau data kosong di urutan paling akhir
+    if val_str.lower() in ['grand total', '(blank)', 'nan', 'none', '']:
+        return pd.Timestamp.max
+        
+    # Coba format 'Mon-YY' (misal: oct-24, nov-24, dec-24, jan-25)
+    dt = pd.to_datetime(val_str, format='%b-%y', errors='coerce')
+    
+    # Jika gagal, coba format 'Mon YYYY'
     if pd.isna(dt):
         dt = pd.to_datetime(val_str, format='%b %Y', errors='coerce')
+        
+    # Jika masih gagal, coba deteksi otomatis umum
+    if pd.isna(dt):
+        dt = pd.to_datetime(val_str, errors='coerce')
+        
     return dt if pd.notna(dt) else pd.Timestamp.min
 
 # ==========================================
