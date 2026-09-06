@@ -918,4 +918,4 @@ if not df_risk_vat.empty:
     </body>
     </html>
     """
-    components.html(full_html_vat, height=450, scrolling=True)
+    components.html(full_html_vat, height=550, scrolling=True)
