@@ -5,18 +5,19 @@ import plotly.graph_objects as go
 import streamlit.components.v1 as components
 import re
 
-# ==========================================
-# GLOBAL HELPER: PENGURUTAN KRONOLOGIS BULAN
-# ==========================================
+# =====================================================================
+# 1. LETAKKAN FUNGSI get_sort_key DI SINI (BAGIAN ATAS SETELAH IMPORT)
+# =====================================================================
 def get_sort_key(val):
-    """Fungsi helper universal untuk parsing format bulan secara kronologis (dari Oktober 2024 ke atas)"""
-    val_str = str(val).strip()
-    
-    # Letakkan Grand Total atau data kosong di urutan paling akhir
-    if val_str.lower() in ['grand total', '(blank)', 'nan', 'none', '']:
+    """Fungsi helper universal untuk parsing format bulan secara kronologis (dari 2024 ke atas)"""
+    if pd.isna(val):
         return pd.Timestamp.max
         
-    # Tangani format teks lokal/singkatan (misal: Okt-24, Mac-25, Des-24) dengan normalisasi ke Bahasa Inggris
+    val_str = str(val).strip()
+    
+    if val_str.lower() in ['grand total', '(blank)', 'nan', 'none', '', 'nat']:
+        return pd.Timestamp.max
+        
     month_map = {
         'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr', 'may': 'May', 'jun': 'Jun',
         'jul': 'Jul', 'aug': 'Aug', 'sep': 'Sep', 'oct': 'Oct', 'nov': 'Nov', 'dec': 'Dec',
@@ -28,20 +29,23 @@ def get_sort_key(val):
             val_str = re.sub(r'^(?i)' + id_m, en_m, val_str)
             break
 
-    # Coba format 'Mon-YY' atau 'Mon YY' (misal: oct-24, nov 24)
-    dt = pd.to_datetime(val_str, format='%b-%y', errors='coerce')
-    if pd.isna(dt):
-        dt = pd.to_datetime(val_str, format='%b %y', errors='coerce')
-    
-    # Jika gagal, coba format 'Mon YYYY'
-    if pd.isna(dt):
-        dt = pd.to_datetime(val_str, format='%b %Y', errors='coerce')
-        
-    # Jika masih gagal, coba deteksi otomatis umum
-    if pd.isna(dt):
-        dt = pd.to_datetime(val_str, errors='coerce')
-        
+    formats = ['%b-%y', '%b %y', '%b-%Y', '%b %Y', '%Y-%m', '%m-%Y', '%Y/%m', '%m/%Y']
+    for fmt in formats:
+        dt = pd.to_datetime(val_str, format=fmt, errors='coerce')
+        if pd.notna(dt):
+            return dt
+
+    dt = pd.to_datetime(val_str, errors='coerce')
     return dt if pd.notna(dt) else pd.Timestamp.min
+
+# =====================================================================
+# 2. KONFIGURASI HALAMAN STREAMLIT
+# =====================================================================
+st.set_page_config(
+    page_title="Dashboard POB IBS Building Management",
+    page_icon="📊",
+    layout="wide"
+)
 # ==========================================
 # 1. KONFIGURASI HALAMAN & HEADER
 # ==========================================
