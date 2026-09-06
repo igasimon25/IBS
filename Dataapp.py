@@ -720,7 +720,7 @@ if not df_tsel_agent.empty:
     </body>
     </html>
     """
-    components.html(full_html_tsel, height=550, scrolling=False)
+    components.html(full_html_tsel, height=650, scrolling=False)
     
 def generate_risk_vat_summary(df):
     df_calc = df.copy()
