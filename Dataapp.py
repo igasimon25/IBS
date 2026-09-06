@@ -5,47 +5,6 @@ import plotly.graph_objects as go
 import streamlit.components.v1 as components
 import re
 
-# =====================================================================
-# 1. LETAKKAN FUNGSI get_sort_key DI SINI (BAGIAN ATAS SETELAH IMPORT)
-# =====================================================================
-def get_sort_key(val):
-    """Fungsi helper universal untuk parsing format bulan secara kronologis (dari 2024 ke atas)"""
-    if pd.isna(val):
-        return pd.Timestamp.max
-        
-    val_str = str(val).strip()
-    
-    if val_str.lower() in ['grand total', '(blank)', 'nan', 'none', '', 'nat']:
-        return pd.Timestamp.max
-        
-    month_map = {
-        'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr', 'may': 'May', 'jun': 'Jun',
-        'jul': 'Jul', 'aug': 'Aug', 'sep': 'Sep', 'oct': 'Oct', 'nov': 'Nov', 'dec': 'Dec',
-        'des': 'Dec', 'mei': 'May', 'agt': 'Aug', 'okt': 'Oct'
-    }
-    
-    for id_m, en_m in month_map.items():
-        if val_str.lower().startswith(id_m):
-            val_str = re.sub(r'^(?i)' + id_m, en_m, val_str)
-            break
-
-    formats = ['%b-%y', '%b %y', '%b-%Y', '%b %Y', '%Y-%m', '%m-%Y', '%Y/%m', '%m/%Y']
-    for fmt in formats:
-        dt = pd.to_datetime(val_str, format=fmt, errors='coerce')
-        if pd.notna(dt):
-            return dt
-
-    dt = pd.to_datetime(val_str, errors='coerce')
-    return dt if pd.notna(dt) else pd.Timestamp.min
-
-# =====================================================================
-# 2. KONFIGURASI HALAMAN STREAMLIT
-# =====================================================================
-st.set_page_config(
-    page_title="Dashboard POB IBS Building Management",
-    page_icon="📊",
-    layout="wide"
-)
 # ==========================================
 # 1. KONFIGURASI HALAMAN & HEADER
 # ==========================================
@@ -57,6 +16,7 @@ st.set_page_config(
 
 st.title("📊 DASHBOARD POB IBS BUILDING MANAGEMENT")
 st.markdown("---")
+
 # ==========================================
 # 2. BACA DATA GOOGLE SHEETS & DATA CLEANING
 # ==========================================
@@ -627,7 +587,7 @@ if not df_summary_raw.empty:
     </body>
     </html>
     """
-    components.html(full_html, height=650, scrolling=True)
+    components.html(full_html, height=550, scrolling=True)
 
 # ==========================================
 # 10. REIMBURSEMENT SUMMARY TO TSEL & AGENT
@@ -760,7 +720,7 @@ if not df_tsel_agent.empty:
     </body>
     </html>
     """
-    components.html(full_html, height=650, scrolling=True)
+    components.html(full_html_tsel, height=550, scrolling=True)
 
 def generate_risk_vat_summary(df):
     df_calc = df.copy()
@@ -934,7 +894,7 @@ if not df_risk_vat.empty:
     </style>
     </head>
     <body>
-    <div style="overflow-x: auto; max-height: 550px;">
+    <div style="overflow-x: auto; max-height: 480px;">
         <table>
             <thead>
                 <tr>
@@ -958,7 +918,7 @@ if not df_risk_vat.empty:
     </body>
     </html>
     """
-    components.html(full_html, height=650, scrolling=True)
+    components.html(full_html_vat, height=550, scrolling=True)
 
 # ==========================================
 # 12. MANAGEMENT FEE PROCESS SUMMARY
@@ -1123,9 +1083,7 @@ if not df_manfee.empty:
     </body>
     </html>
     """
-    
-    components.html(full_html, height=650, scrolling=True)
-
+    components.html(full_html_mf, height=480, scrolling=True)
 
 # ==========================================
 # 13. STATUS REJECTION SAP SUMMARY (DROPDOWN MULTI-SELECT)
@@ -1272,7 +1230,7 @@ if not df_reject_summary.empty and col_reg_name:
     </style>
     </head>
     <body>
-    <div style="overflow-x: auto; max-height: 550px;">
+    <div style="overflow-x: auto; max-height: 450px;">
         <table>
             <thead>
                 <tr>
@@ -1290,7 +1248,7 @@ if not df_reject_summary.empty and col_reg_name:
     </body>
     </html>
     """
-    components.html(full_html_reject, height=650, scrolling=True)
+    components.html(full_html_reject, height=400, scrolling=True)
 else:
     st.info("Tidak ada data dengan Status SAP 'Rejected' yang sesuai dengan pilihan filter saat ini.")
 
@@ -1565,6 +1523,6 @@ if not df_trk_res.empty:
     </body>
     </html>
     """
-    components.html(full_trk_html, height=650, scrolling=False)
+    components.html(full_trk_html, height=520, scrolling=False)
 else:
     st.warning("Data Tracking Invoice tidak ditemukan berdasarkan filter yang dipilih.")
