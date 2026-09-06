@@ -603,8 +603,8 @@ if not df_summary_raw.empty:
     </body>
     </html>
     """
-    components.html(full_html, height=450, scrolling=True)
-
+    calc_height = min(750, max(200, (len(df_summary_raw) + 2) * 28))
+    components.html(full_html, height=calc_height, scrolling=True)
 # ==========================================
 # 10. REIMBURSEMENT SUMMARY TO TSEL & AGENT
 # ==========================================
