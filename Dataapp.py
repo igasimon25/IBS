@@ -1254,7 +1254,7 @@ else:
 
 
 # ==========================================
-# 14. STATUS TRACKING INVOICE BM (FIXED)
+# 14. STATUS TRACKING INVOICE BM (FINAL FIXED)
 # ==========================================
 st.markdown("---")
 st.subheader("📊 Status Tracking Invoice BM")
@@ -1277,7 +1277,7 @@ df_tracking = df_filtered.copy()
 with col_f1:
     if col_area_tr:
         opts_area = sorted(df_filtered[col_area_tr].dropna().astype(str).unique())
-        sel_area = st.multiselect("Select Area", options=opts_area, default=opts_area, key="track_area_sel_fix")
+        sel_area = st.multiselect("Select Area", options=opts_area, default=opts_area, key="track_area_sel_final")
         if sel_area:
             df_tracking = df_tracking[df_tracking[col_area_tr].astype(str).isin(sel_area)]
         else:
@@ -1286,7 +1286,7 @@ with col_f1:
 with col_f2:
     if col_year_tr:
         opts_year = sorted(df_filtered[col_year_tr].dropna().astype(str).unique())
-        sel_year = st.multiselect("Select Year", options=opts_year, default=opts_year, key="track_year_sel_fix")
+        sel_year = st.multiselect("Select Year", options=opts_year, default=opts_year, key="track_year_sel_final")
         if sel_year:
             df_tracking = df_tracking[df_tracking[col_year_tr].astype(str).isin(sel_year)]
         else:
@@ -1295,7 +1295,7 @@ with col_f2:
 with col_f3:
     if col_pic_tr:
         opts_pic = sorted(df_filtered[col_pic_tr].dropna().astype(str).unique())
-        sel_pic = st.multiselect("Select PIC Site", options=opts_pic, default=opts_pic, key="track_pic_sel_fix")
+        sel_pic = st.multiselect("Select PIC Site", options=opts_pic, default=opts_pic, key="track_pic_sel_final")
         if sel_pic:
             df_tracking = df_tracking[df_tracking[col_pic_tr].astype(str).isin(sel_pic)]
         else:
@@ -1323,11 +1323,17 @@ if not df_tracking.empty and col_reg_tr and col_supp_tr and col_site_tr and col_
     df_tracking['Clean_Month'] = df_tracking[col_month_tr].astype(str).str.lower().str.strip().map(month_mapping).fillna(df_tracking[col_month_tr].astype(str))
     all_months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-    # Pastikan index kolom 1-dimensi dan bersih dari duplikasi nama
-    index_cols = list(dict.fromkeys([col_reg_tr, col_supp_tr, col_site_tr]))
+    # Pastikan list index bersih, unik, dan berupa 1-dimensi murni untuk menghindari error Grouper
+    index_cols = [c for c in [col_reg_tr, col_supp_tr, col_site_tr] if c is not None]
+    index_cols = list(dict.fromkeys(index_cols))
+
+    df_clean_pivot = df_tracking.copy()
+    for col in index_cols:
+        if isinstance(df_clean_pivot[col], pd.DataFrame):
+            df_clean_pivot[col] = df_clean_pivot[col].iloc[:, 0]
 
     # Pivot Table untuk Tracking Invoice
-    pivot_track = df_tracking.pivot_table(
+    pivot_track = df_clean_pivot.pivot_table(
         index=index_cols,
         columns='Clean_Month',
         values=col_site_tr,
@@ -1351,7 +1357,7 @@ if not df_tracking.empty and col_reg_tr and col_supp_tr and col_site_tr and col_
     pivot_track['Invoice NY Received'] = (12 - pivot_track['Grand Total']).apply(lambda x: max(0, x))
 
     # Metrik Ringkasan di Bagian Atas
-    total_sites = pivot_track[col_site_tr].nunique()
+    total_sites = df_clean_pivot[col_site_tr].nunique()
     avg_progress = pivot_track['Progress'].mean()
     total_ny_received = pivot_track['Invoice NY Received'].sum()
 
