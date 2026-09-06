@@ -1254,7 +1254,7 @@ else:
 
 
 # ==========================================
-# STATUS TRACKING INVOICE BM (GITHUB READY - FINAL FIX)
+# STATUS TRACKING INV BM (GITHUB READY + NEW REGIONAL FILTER)
 # ==========================================
 st.markdown("---")
 st.subheader("📊 Status Tracking Invoice BM")
@@ -1292,28 +1292,33 @@ for col in df_source.columns:
         df_source[col] = df_source[col].iloc[:, 0]
 
 # ------------------------------------------
-# 2. FILTER DATA (AREA, YEAR, PIC SITE)
+# 2. FILTER DATA (AREA, YEAR, PIC SITE, NEW REGIONAL)
 # ------------------------------------------
-col_area = next((c for c in ['Area (Khusus SAP)', 'Area', 'Region', 'new regional'] if c in df_source.columns), None)
+col_area = next((c for c in ['Area (Khusus SAP)', 'Area', 'Region'] if c in df_source.columns), None)
 col_year = next((c for c in ['Year', 'Tahun', 'Payment Year'] if c in df_source.columns), None)
 col_pic = next((c for c in ['PIC Site (Khusus SAP)', 'PIC Site', 'PIC', 'pic_site'] if c in df_source.columns), None)
+col_reg = next((c for c in ['new regional', 'Regional', 'regional'] if c in df_source.columns), None)
 
 st.markdown("#### 🔍 Filter Data Tracking")
-col1, col2, col3 = st.columns(3)
+f_col1, f_col2, f_col3, f_col4 = st.columns(4)
 
-with col1:
+with f_col1:
     opts_area = ["All"] + sorted(list(df_source[col_area].dropna().astype(str).unique())) if col_area else ["All"]
-    sel_area = st.selectbox("Select Area", opts_area, key="trk_area_github_v3")
+    sel_area = st.selectbox("Select Area", opts_area, key="trk_area_github_v4")
 
-with col2:
+with f_col2:
     opts_year = ["All"] + sorted(list(df_source[col_year].dropna().astype(str).unique())) if col_year else ["All"]
-    sel_year = st.selectbox("Select Year", opts_year, key="trk_year_github_v3")
+    sel_year = st.selectbox("Select Year", opts_year, key="trk_year_github_v4")
 
-with col3:
+with f_col3:
     opts_pic = ["All"] + sorted(list(df_source[col_pic].dropna().astype(str).unique())) if col_pic else ["All"]
-    sel_pic = st.selectbox("Select PIC Site", opts_pic, key="trk_pic_github_v3")
+    sel_pic = st.selectbox("Select PIC Site", opts_pic, key="trk_pic_github_v4")
 
-# Logika Filtering
+with f_col4:
+    opts_reg = ["All"] + sorted(list(df_source[col_reg].dropna().astype(str).unique())) if col_reg else ["All"]
+    sel_reg = st.selectbox("Select New Regional", opts_reg, key="trk_reg_github_v4")
+
+# Logika Filtering Bertingkat
 df_trk_filtered = df_source.copy()
 if sel_area != "All" and col_area:
     df_trk_filtered = df_trk_filtered[df_trk_filtered[col_area].astype(str) == sel_area]
@@ -1321,6 +1326,8 @@ if sel_year != "All" and col_year:
     df_trk_filtered = df_trk_filtered[df_trk_filtered[col_year].astype(str) == sel_year]
 if sel_pic != "All" and col_pic:
     df_trk_filtered = df_trk_filtered[df_trk_filtered[col_pic].astype(str) == sel_pic]
+if sel_reg != "All" and col_reg:
+    df_trk_filtered = df_trk_filtered[df_trk_filtered[col_reg].astype(str) == sel_reg]
 
 
 # ------------------------------------------
@@ -1394,7 +1401,7 @@ def generate_tracking_invoice_table(df_input):
 
     pivot_df = pivot_df[index_cols + months_order]
 
-    # Menggunakan .map() agar kompatibel dengan Pandas versi terbaru di GitHub
+    # Menggunakan .map() kompatibel Pandas versi baru di GitHub
     for m in months_order:
         pivot_df[m] = pivot_df[m].map(lambda x: 1 if x > 0 else 0)
 
