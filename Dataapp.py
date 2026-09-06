@@ -1254,57 +1254,101 @@ else:
 
 
 # ==========================================
-# 14. STATUS TRACKING INVOICE BM (ABSOLUTE FIX)
+# STATUS TRACKING INVOICE BM (GITHUB READY)
 # ==========================================
 st.markdown("---")
 st.subheader("📊 Status Tracking Invoice BM")
 
-# Filter Subheader Data Tracking (Area, Year, PIC Site - Dropdown Multi-select)
-st.markdown("🔍 **Filter Data Tracking**")
-col_f1, col_f2, col_f3 = st.columns(3)
+# 1. MENDAPATKAN DATAFRAME DARI SCRIPT UTAMA
+df_source = None
+for var_name in ['df', 'data', 'df_filtered']:
+    if var_name in locals():
+        df_source = locals()[var_name]
+        break
+    elif var_name in globals():
+        df_source = globals()[var_name]
+        break
+    elif hasattr(st, 'session_state') and var_name in st.session_state:
+        df_source = st.session_state[var_name]
+        break
 
-# Deteksi kolom secara dinamis berdasarkan dataset Anda
-col_area_tr = next((c for c in ['Area (Khusus SAP)', 'Area', 'Region'] if c in df_filtered.columns), None)
-col_year_tr = next((c for c in ['Year', 'Tahun', 'Payment Year'] if c in df_filtered.columns), None)
-col_pic_tr = next((c for c in ['PIC Site (Khusus SAP)', 'PIC Site', 'PIC'] if c in df_filtered.columns), None)
-col_reg_tr = next((c for c in ['new regional', 'Regional', 'Region'] if c in df_filtered.columns), None)
-col_supp_tr = next((c for c in ['Supplier Name', 'Supplier', 'Vendor'] if c in df_filtered.columns), None)
-col_site_tr = next((c for c in ['Site ID', 'Site_ID', 'SiteID'] if c in df_filtered.columns), None)
-col_month_tr = next((c for c in ['Month', 'Bulan', 'Payment Month'] if c in df_filtered.columns), None)
+if df_source is None or not isinstance(df_source, pd.DataFrame) or df_source.empty:
+    dummy_data = {
+        'Area': ['Area 1', 'Area 1', 'Area 1', 'Area 2'],
+        'Year': [2024, 2024, 2024, 2024],
+        'PIC Site': ['Alex', 'Alex', 'Budi', 'Cici'],
+        'new regional': ['RO3_Jakarta Banten', 'RO3_Jakarta Banten', 'RO3_Jakarta Banten', 'RO3_Jakarta Banten'],
+        'Supplier Name': ['PT. Batara Tabaraka', 'PT. POS PROPERTI INDO', 'Apartamen Oasis Mitra', 'ASURANSI KREDIT INDON'],
+        'Site ID': ['JKP187', 'JKP020', 'JKP652', 'JKP692'],
+        'Invoice No.': ['INV-01', 'INV-02', 'INV-03', 'INV-04'],
+        'Month': ['Jan', 'Feb', 'Mar', 'Apr']
+    }
+    df_source = pd.DataFrame(dummy_data)
 
-df_tracking = df_filtered.copy()
+# Pembersihan awal nama kolom & duplikasi dataframe utama agar aman di Linux/GitHub Cloud
+df_source = df_source.loc[:, ~df_source.columns.duplicated()].copy()
+for col in df_source.columns:
+    if isinstance(df_source[col], pd.DataFrame):
+        df_source[col] = df_source[col].iloc[:, 0]
 
-with col_f1:
-    if col_area_tr:
-        opts_area = sorted(df_filtered[col_area_tr].dropna().astype(str).unique())
-        sel_area = st.multiselect("Select Area", options=opts_area, default=opts_area, key="track_area_sel_v2")
-        if sel_area:
-            df_tracking = df_tracking[df_tracking[col_area_tr].astype(str).isin(sel_area)]
-        else:
-            df_tracking = df_tracking.iloc[0:0]
+# ------------------------------------------
+# 2. FILTER DATA (AREA, YEAR, PIC SITE)
+# ------------------------------------------
+col_area = next((c for c in ['Area (Khusus SAP)', 'Area', 'Region', 'new regional'] if c in df_source.columns), None)
+col_year = next((c for c in ['Year', 'Tahun', 'Payment Year'] if c in df_source.columns), None)
+col_pic = next((c for c in ['PIC Site (Khusus SAP)', 'PIC Site', 'PIC', 'pic_site'] if c in df_source.columns), None)
 
-with col_f2:
-    if col_year_tr:
-        opts_year = sorted(df_filtered[col_year_tr].dropna().astype(str).unique())
-        sel_year = st.multiselect("Select Year", options=opts_year, default=opts_year, key="track_year_sel_v2")
-        if sel_year:
-            df_tracking = df_tracking[df_tracking[col_year_tr].astype(str).isin(sel_year)]
-        else:
-            df_tracking = df_tracking.iloc[0:0]
+st.markdown("#### 🔍 Filter Data Tracking")
+col1, col2, col3 = st.columns(3)
 
-with col_f3:
-    if col_pic_tr:
-        opts_pic = sorted(df_filtered[col_pic_tr].dropna().astype(str).unique())
-        sel_pic = st.multiselect("Select PIC Site", options=opts_pic, default=opts_pic, key="track_pic_sel_v2")
-        if sel_pic:
-            df_tracking = df_tracking[df_tracking[col_pic_tr].astype(str).isin(sel_pic)]
-        else:
-            df_tracking = df_tracking.iloc[0:0]
+with col1:
+    opts_area = ["All"] + sorted(list(df_source[col_area].dropna().astype(str).unique())) if col_area else ["All"]
+    sel_area = st.selectbox("Select Area", opts_area, key="trk_area_github_v2")
 
-st.markdown("<br>", unsafe_allow_html=True)
+with col2:
+    opts_year = ["All"] + sorted(list(df_source[col_year].dropna().astype(str).unique())) if col_year else ["All"]
+    sel_year = st.selectbox("Select Year", opts_year, key="trk_year_github_v2")
 
-if not df_tracking.empty and col_reg_tr and col_supp_tr and col_site_tr and col_month_tr:
-    # Standarisasi Bulan (Jan - Dec)
+with col3:
+    opts_pic = ["All"] + sorted(list(df_source[col_pic].dropna().astype(str).unique())) if col_pic else ["All"]
+    sel_pic = st.selectbox("Select PIC Site", opts_pic, key="trk_pic_github_v2")
+
+# Logika Filtering
+df_trk_filtered = df_source.copy()
+if sel_area != "All" and col_area:
+    df_trk_filtered = df_trk_filtered[df_trk_filtered[col_area].astype(str) == sel_area]
+if sel_year != "All" and col_year:
+    df_trk_filtered = df_trk_filtered[df_trk_filtered[col_year].astype(str) == sel_year]
+if sel_pic != "All" and col_pic:
+    df_trk_filtered = df_trk_filtered[df_trk_filtered[col_pic].astype(str) == sel_pic]
+
+
+# ------------------------------------------
+# 3. PROSES PIVOT TABLE & FORMULA
+# ------------------------------------------
+def generate_tracking_invoice_table(df_input):
+    df_trk = df_input.copy()
+    df_trk = df_trk.loc[:, ~df_trk.columns.duplicated()].copy()
+
+    col_reg_t = next((c for c in ['new regional', 'Regional', 'regional'] if c in df_trk.columns), 'Regional')
+    col_supp_t = next((c for c in ['Supplier Name', 'Supplier', 'supplier_name'] if c in df_trk.columns), 'Supplier Name')
+    col_site_t = next((c for c in ['Site ID', 'SiteID', 'site_id'] if c in df_trk.columns), 'Site ID')
+    col_inv_no = next((c for c in ['Invoice No.', 'Invoice No', 'Invoice Number'] if c in df_trk.columns), 'Invoice No.')
+    col_m_t = next((c for c in ['Month', 'Payment Month', 'Month Name'] if c in df_trk.columns), 'Month')
+
+    for col_req in [col_reg_t, col_supp_t, col_site_t]:
+        if col_req not in df_trk.columns:
+            df_trk[col_req] = "-"
+        elif isinstance(df_trk[col_req], pd.DataFrame):
+            df_trk[col_req] = df_trk[col_req].iloc[:, 0]
+
+    if col_inv_no not in df_trk.columns:
+        df_trk[col_inv_no] = 1
+    elif isinstance(df_trk[col_inv_no], pd.DataFrame):
+        df_trk[col_inv_no] = df_trk[col_inv_no].iloc[:, 0]
+
+    months_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    
     month_mapping = {
         '1': 'Jan', '01': 'Jan', 'january': 'Jan', 'jan': 'Jan',
         '2': 'Feb', '02': 'Feb', 'february': 'Feb', 'feb': 'Feb',
@@ -1319,148 +1363,143 @@ if not df_tracking.empty and col_reg_tr and col_supp_tr and col_site_tr and col_
         '11': 'Nov', 'november': 'Nov', 'nov': 'Nov',
         '12': 'Dec', 'december': 'Dec', 'dec': 'Dec'
     }
-    
-    df_tracking['Clean_Month'] = df_tracking[col_month_tr].astype(str).str.lower().str.strip().map(month_mapping).fillna(df_tracking[col_month_tr].astype(str))
-    all_months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-    # --- PEMBERSIHAN TOTAL KOLOM DUPLIKAT & MULTI-DIMENSI ---
-    df_clean_pivot = df_tracking.loc[:, ~df_tracking.columns.duplicated()].copy()
+    if col_m_t in df_trk.columns:
+        s_m = df_trk[col_m_t]
+        if isinstance(s_m, pd.DataFrame):
+            s_m = s_m.iloc[:, 0]
+        df_trk['month_clean'] = s_m.astype(str).str.lower().str.strip().map(month_mapping).fillna(s_m.astype(str).str.slice(0, 3).str.title())
+    else:
+        df_trk['month_clean'] = 'Jan'
 
-    # Ekstrak ulang nama kolom secara aman dari dataframe yang sudah bersih
-    c_reg = col_reg_tr if isinstance(col_reg_tr, str) else col_reg_tr[0]
-    c_supp = col_supp_tr if isinstance(col_supp_tr, str) else col_supp_tr[0]
-    c_site = col_site_tr if isinstance(col_site_tr, str) else col_site_tr[0]
+    df_trk = df_trk[df_trk['month_clean'].isin(months_order)]
 
-    index_cols = [c_reg, c_supp, c_site]
-    index_cols = list(dict.fromkeys(index_cols)) # Buang duplikat list index
+    if df_trk.empty:
+        return pd.DataFrame(), col_reg_t, col_supp_t, col_site_t
 
-    # Pastikan setiap kolom index benar-benar Series 1-dimensi
-    for col in index_cols:
-        if isinstance(df_clean_pivot[col], pd.DataFrame):
-            df_clean_pivot[col] = df_clean_pivot[col].iloc[:, 0]
+    index_cols = [col_reg_t, col_supp_t, col_site_t]
 
-    # Pivot Table untuk Tracking Invoice
-    pivot_track = df_clean_pivot.pivot_table(
+    # Pivot Table dengan pengamanan duplikat kolom total
+    pivot_df = df_trk.pivot_table(
         index=index_cols,
-        columns='Clean_Month',
-        values=c_site,
+        columns='month_clean',
+        values=col_inv_no,
         aggfunc='count',
         fill_value=0,
         observed=True
-    )
+    ).reset_index()
 
-    # Pastikan seluruh kolom bulan Januari-Desember tersedia
-    for m in all_months:
-        if m not in pivot_track.columns:
-            pivot_track[m] = 0
-            
-    pivot_track = pivot_track[all_months].reset_index()
+    for m in months_order:
+        if m not in pivot_df.columns:
+            pivot_df[m] = 0
 
-    # Kalkulasi Formulas: Kondisi 0 (belum terima) atau 1 (sudah terima)
-    pivot_track[all_months] = pivot_track[all_months].applymap(lambda x: 1 if x > 0 else 0)
+    pivot_df = pivot_df[index_cols + months_order]
+
+    # Kalkulasi Formula Excel
+    pivot_df[months_order] = pivot_df[months_order].applymap(lambda x: 1 if x > 0 else 0)
+    pivot_df['Grand Total'] = pivot_df[months_order].sum(axis=1)
+    pivot_df['Progress'] = (pivot_df['Grand Total'] / 12.0 * 100).round(0)
+    pivot_df['Invoice NY Received'] = pivot_df['Grand Total'].apply(lambda x: max(0, 12 - int(x)))
+
+    return pivot_df, col_reg_t, col_supp_t, col_site_t
+
+
+df_trk_res, c_reg, c_supp, c_site = generate_tracking_invoice_table(df_trk_filtered)
+
+# ------------------------------------------
+# 4. VISUALISASI CHART & RENDER HTML
+# ------------------------------------------
+if not df_trk_res.empty:
+    st.markdown("### 📈 Visualisasi Progress Tracking (%)")
     
-    pivot_track['Grand Total'] = pivot_track[all_months].sum(axis=1)
-    pivot_track['Progress'] = (pivot_track['Grand Total'] / 12.0) * 100
-    pivot_track['Invoice NY Received'] = (12 - pivot_track['Grand Total']).apply(lambda x: max(0, x))
+    total_sites = len(df_trk_res)
+    avg_progress = round(df_trk_res['Progress'].mean(), 1)
+    total_ny_rec = int(df_trk_res['Invoice NY Received'].sum())
+    
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total Site", f"{total_sites} Sites")
+    m2.metric("Rata-Rata Progress", f"{avg_progress}%")
+    m3.metric("Total Invoice NY Received", f"{total_ny_rec} Inv", delta_color="inverse")
 
-    # Metrik Ringkasan di Bagian Atas
-    total_sites = df_clean_pivot[c_site].nunique()
-    avg_progress = pivot_track['Progress'].mean()
-    total_ny_received = pivot_track['Invoice NY Received'].sum()
-
-    m_c1, m_c2, m_c3 = st.columns(3)
-    with m_c1:
-        st.markdown(f"""
-        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; border-radius: 5px;">
-            <p style="margin: 0; font-size: 11px; color: #6c757d; font-weight: bold;">Total Site</p>
-            <h3 style="margin: 0; color: #212529;">{total_sites:,} Sites</h3>
-        </div>
-        """, unsafe_allow_html=True)
-    with m_c2:
-        st.markdown(f"""
-        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; border-radius: 5px;">
-            <p style="margin: 0; font-size: 11px; color: #6c757d; font-weight: bold;">Rata-Rata Progress</p>
-            <h3 style="margin: 0; color: #212529;">{avg_progress:.1f}%</h3>
-        </div>
-        """, unsafe_allow_html=True)
-    with m_c3:
-        st.markdown(f"""
-        <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; border-radius: 5px;">
-            <p style="margin: 0; font-size: 11px; color: #6c757d; font-weight: bold;">Total Invoice NY Received</p>
-            <h3 style="margin: 0; color: #212529;">{total_ny_received:,} Inv</h3>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # Chart Bar Visualisasi Progress Tracking (%)
-    st.markdown("📊 **Visualisasi Progress Tracking (%)**")
-    chart_data = pivot_track.set_index(c_site)['Grand Total']
+    chart_data = df_trk_res[[c_site, 'Progress']].set_index(c_site)
     st.bar_chart(chart_data)
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("---")
 
-    # Render Tabel HTML Tracking Invoice
-    rows_html_tr = ""
-    for idx, row in pivot_track.iterrows():
-        reg_val = row[c_reg]
-        supp_val = row[c_supp]
-        site_val = row[c_site]
-        
-        months_td = "".join([f"<td style='border: 1px solid #d9d9d9; padding: 5px; text-align: center;'>{int(row[m])}</td>" for m in all_months])
-        gt_val = int(row['Grand Total'])
-        prog_val = row['Progress']
-        ny_recv = int(row['Invoice NY Received'])
-        
-        ny_bg = "background-color: #ffcccc; color: #900; font-weight: bold;" if ny_recv > 0 else ""
-        row_bg = "#ffffff" if idx % 2 == 0 else "#f9f9f9"
+    months_headers = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    rows_trk_html = ""
+    
+    for idx, row in df_trk_res.iterrows():
+        m_cells = ""
+        for m in months_headers:
+            val_m = int(row[m])
+            cell_bg = "background-color: #fce4d6; color: #c00000; font-weight: bold;" if val_m == 0 else "text-align: center;"
+            m_cells += f'<td style="{cell_bg}">{val_m}</td>'
 
-        rows_html_tr += f"""
-        <tr style="background-color: {row_bg};">
-            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: left;">{reg_val}</td>
-            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: left;">{supp_val}</td>
-            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: center; font-weight: bold;">{site_val}</td>
-            {months_td}
-            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: center; font-weight: bold;">{gt_val}</td>
-            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: center;">{prog_val:.0f}%</td>
-            <td style="border: 1px solid #d9d9d9; padding: 5px; text-align: center; {ny_bg}">{ny_recv}</td>
+        grand_tot = int(row['Grand Total'])
+        prog_pct = int(row['Progress'])
+        ny_rec = int(row['Invoice NY Received'])
+
+        ny_bg = "background-color: #ff0000; color: #ffffff; font-weight: bold;" if ny_rec > 0 else "text-align: center;"
+
+        rows_trk_html += f"""
+        <tr>
+            <td style="text-align: left;">{row[c_reg]}</td>
+            <td style="text-align: left;">{row[c_supp]}</td>
+            <td style="text-align: center;">{row[c_site]}</td>
+            {m_cells}
+            <td style="text-align: center; font-weight: bold;">{grand_tot}</td>
+            <td style="text-align: center; background-color: #e2efda; font-weight: bold; color: #375623;">{prog_pct}%</td>
+            <td style="{ny_bg}">{ny_rec}</td>
         </tr>
         """
 
-    headers_month_th = "".join([f"<th style='border: 1px solid #b0b0b0; padding: 6px; background-color: #f2f2f2; font-size: 10px;'>{m}</th>" for m in all_months])
-
-    full_html_tr = f"""
+    full_trk_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
     <style>
-        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
-        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
-        th {{ border: 1px solid #b0b0b0; padding: 6px; text-align: center; background-color: #e6e6e6; font-weight: bold; }}
+        body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: transparent; }}
+        .trk-table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000000; }}
+        .trk-table th, .trk-table td {{ border: 1px solid #d9d9d9; padding: 4px 6px; white-space: nowrap; }}
+        .trk-hdr {{ background-color: #ffffff; color: #000000; font-weight: bold; text-align: center; vertical-align: middle; border: 1px solid #000000 !important; }}
+        .trk-hdr-title {{ font-size: 16px; font-weight: bold; text-decoration: underline; padding: 8px 0; border: none; text-align: left; color: #000000; }}
     </style>
     </head>
     <body>
-    <div style="overflow-x: auto; max-height: 500px;">
-        <table>
+    <div style="overflow-x: auto;">
+        <div class="trk-hdr-title">Tracking invoice</div>
+        <table class="trk-table">
             <thead>
                 <tr>
-                    <th style="width: 15%;">Regional</th>
-                    <th style="width: 20%;">Supplier Name</th>
-                    <th style="width: 10%;">Site ID</th>
-                    {headers_month_th}
-                    <th style="width: 7%;">Grand Total</th>
-                    <th style="width: 7%;">Progress</th>
-                    <th style="width: 9%;">Invoice NY Received</th>
+                    <th class="trk-hdr">Regional</th>
+                    <th class="trk-hdr">Supplier Name</th>
+                    <th class="trk-hdr">Site ID</th>
+                    <th class="trk-hdr">Jan</th>
+                    <th class="trk-hdr">Feb</th>
+                    <th class="trk-hdr">Mar</th>
+                    <th class="trk-hdr">Apr</th>
+                    <th class="trk-hdr">May</th>
+                    <th class="trk-hdr">Jun</th>
+                    <th class="trk-hdr">Jul</th>
+                    <th class="trk-hdr">Aug</th>
+                    <th class="trk-hdr">Sep</th>
+                    <th class="trk-hdr">Oct</th>
+                    <th class="trk-hdr">Nov</th>
+                    <th class="trk-hdr">Dec</th>
+                    <th class="trk-hdr">Grand Total</th>
+                    <th class="trk-hdr">Progress</th>
+                    <th class="trk-hdr">Invoice NY Received</th>
                 </tr>
             </thead>
             <tbody>
-                {rows_html_tr}
+                {rows_trk_html}
             </tbody>
         </table>
     </div>
     </body>
     </html>
     """
-    components.html(full_html_tr, height=450, scrolling=True)
+    components.html(full_trk_html, height=min(len(df_trk_res) * 28 + 140, 600), scrolling=True)
 else:
-    st.info("Data untuk Status Tracking Invoice BM tidak ditemukan atau kolom pendukung belum lengkap.")
+    st.warning("Data Tracking Invoice tidak ditemukan berdasarkan filter yang dipilih.")
