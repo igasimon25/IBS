@@ -6,43 +6,6 @@ import streamlit.components.v1 as components
 import re
 
 # ==========================================
-# GLOBAL HELPER: PENGURUTAN KRONOLOGIS BULAN
-# ==========================================
-def get_sort_key(val):
-    """Fungsi helper universal untuk parsing format bulan secara kronologis dari 2024 ke atas"""
-    if pd.isna(val):
-        return pd.Timestamp.max
-        
-    val_str = str(val).strip()
-    
-    # Letakkan Grand Total atau data kosong di urutan paling akhir
-    if val_str.lower() in ['grand total', '(blank)', 'nan', 'none', '', 'nat']:
-        return pd.Timestamp.max
-        
-    # Normalisasi singkatan bulan lokal (ID/EN) ke format standar Inggris
-    month_map = {
-        'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr', 'may': 'May', 'jun': 'Jun',
-        'jul': 'Jul', 'aug': 'Aug', 'sep': 'Sep', 'oct': 'Oct', 'nov': 'Nov', 'dec': 'Dec',
-        'des': 'Dec', 'mei': 'May', 'agt': 'Aug', 'okt': 'Oct'
-    }
-    
-    for id_m, en_m in month_map.items():
-        if val_str.lower().startswith(id_m):
-            val_str = re.sub(r'^(?i)' + id_m, en_m, val_str)
-            break
-
-    # Coba berbagai format string tanggal secara eksplisit
-    formats = ['%b-%y', '%b %y', '%b-%Y', '%b %Y', '%Y-%m', '%m-%Y', '%Y/%m', '%m/%Y']
-    for fmt in formats:
-        dt = pd.to_datetime(val_str, format=fmt, errors='coerce')
-        if pd.notna(dt):
-            return dt
-
-    # Fallback terakhir menggunakan deteksi otomatis pandas
-    dt = pd.to_datetime(val_str, errors='coerce')
-    return dt if pd.notna(dt) else pd.Timestamp.min
-
-# ==========================================
 # 1. KONFIGURASI HALAMAN & HEADER
 # ==========================================
 st.set_page_config(
@@ -664,11 +627,7 @@ def generate_tsel_agent_summary(df):
         'DN_NY': 'sum'
     })
 
-    # Terapkan pengurutan kronologis (dari yang terlama ke terbaru)
-    summary['_sort_key'] = summary[col_m].apply(get_sort_key)
-    summary = summary.sort_values(by='_sort_key', ascending=True).drop(columns=['_sort_key'])
-
-    # Total Row (Dibuat SETELAH data diurutkan agar Grand Total aman di bawah)
+    # Total Row
     grand_total = pd.DataFrame([{
         col_m: 'Grand Total',
         'NET AMOUNT': summary['NET AMOUNT'].sum(),
@@ -686,10 +645,83 @@ def generate_tsel_agent_summary(df):
 
     return full_summary, col_m
 
+df_tsel_agent, col_m_name = generate_tsel_agent_summary(df_filtered)
 
-# ==========================================
-# RISK VAT SUMMARY FUNCTION
-# ==========================================
+if not df_tsel_agent.empty:
+    def fmt_rp_tsel(val):
+        if abs(val) < 1e-9:
+            return "Rp -"
+        elif val < 0:
+            return f"-Rp {abs(val):,.0f}".replace(",", ".")
+        else:
+            return f"Rp {val:,.0f}".replace(",", ".")
+
+    rows_html_tsel = ""
+    for idx, row in df_tsel_agent.iterrows():
+        val_m = row[col_m_name]
+        is_total = (val_m == 'Grand Total')
+        if pd.isna(val_m) or str(val_m).strip().lower() in ['nan', 'none', '']:
+            val_m = "(blank)"
+
+        row_style = "background-color: #f2f2f2; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #fafafa;")
+
+        rows_html_tsel += f"""
+        <tr style="{row_style}">
+            <td style="text-align: center; border: 1px solid #d9d9d9; padding: 5px;">{val_m}</td>
+            <td style="text-align: right; font-weight: bold; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['NET AMOUNT'])}</td>
+            
+            <!-- Reimbursement to TSEL -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['INV_DONE'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['INV_NY'])}</td>
+            <td style="text-align: center; font-weight: bold; background-color: #fce4d6; border: 1px solid #d9d9d9; padding: 5px;">{row['PCT_TSEL']:.2f}%</td>
+            
+            <!-- Reimbursement to Agent -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['DN_DONE'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['DN_NY'])}</td>
+            <td style="text-align: center; font-weight: bold; background-color: #e2efda; border: 1px solid #d9d9d9; padding: 5px;">{row['PCT_AGENT']:.2f}%</td>
+        </tr>
+        """
+
+    full_html_tsel = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
+        th {{ border: 1px solid #b0b0b0; padding: 6px; text-align: center; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+    <div style="overflow-x: auto; max-height: 480px;">
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2" style="background-color: #d9d9d9; width: 10%;">Periode Month</th>
+                    <th rowspan="2" style="background-color: #d9d9d9; width: 13%;">NET AMOUNT</th>
+                    <th colspan="3" style="background-color: #f8c2a6; color: #000;">Reimbursement to TSEL</th>
+                    <th colspan="3" style="background-color: #a9d08e; color: #000;">Reimbursement to Agent</th>
+                </tr>
+                <tr>
+                    <th style="background-color: #fce4d6; width: 13%;">INV. DONE</th>
+                    <th style="background-color: #fce4d6; width: 13%;">INV. NY</th>
+                    <th style="background-color: #f8c2a6; width: 8%;">% Done</th>
+                    
+                    <th style="background-color: #e2efda; width: 13%;">DebitNote DONE</th>
+                    <th style="background-color: #e2efda; width: 13%;">DebitNote NY</th>
+                    <th style="background-color: #a9d08e; width: 8%;">% Done</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html_tsel}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_html_tsel, height=500, scrolling=False)
+    
 def generate_risk_vat_summary(df):
     df_calc = df.copy()
 
@@ -738,10 +770,6 @@ def generate_risk_vat_summary(df):
         'FP_EXP_NET_MINUS_VAT': 'sum',
         'VAT_LOSS': 'sum'
     })
-
-    # Terapkan pengurutan kronologis untuk fungsi risk vat summary juga
-    summary['_sort_key'] = summary[col_m].apply(get_sort_key)
-    summary = summary.sort_values(by='_sort_key', ascending=True).drop(columns=['_sort_key'])
 
     # Grand Total Row
     grand_total = pd.DataFrame([{
@@ -834,7 +862,16 @@ if not df_risk_vat.empty:
         else:
             return f"Rp {val:,.0f}".replace(",", ".")
 
-   rows_html_vat += f"""
+    rows_html_vat = ""
+    for idx, row in df_risk_vat.iterrows():
+        val_m = row[col_m_vat]
+        is_total = (val_m == 'Grand Total')
+        if pd.isna(val_m) or str(val_m).strip().lower() in ['nan', 'none', '']:
+            val_m = "(blank)"
+
+        row_style = "background-color: #b4c6e7; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #f2f2f2;")
+
+        rows_html_vat += f"""
         <tr style="{row_style}">
             <td style="text-align: center; border: 1px solid #7f7f7f; padding: 5px;">{val_m}</td>
             <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp_vat(row['NET_NORMAL'])}</td>
@@ -881,8 +918,7 @@ if not df_risk_vat.empty:
     </body>
     </html>
     """
-    components.html(full_html_vat, height=550, scrolling=True)
-
+    components.html(full_html_vat, height=500, scrolling=True)
 
 # ==========================================
 # 12. MANAGEMENT FEE PROCESS SUMMARY
