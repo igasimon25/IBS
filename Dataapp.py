@@ -187,57 +187,61 @@ def create_compact_donut_card(title, paid_val, ny_val, color_done='#558B2F', col
 # ==========================================
 st.subheader("📌 Key Performance Indicators (KPI Overview)")
 
+# Menggunakan kolom yang otomatis menyesuaikan di HP/Desktop
 cols_kpi = st.columns(5)
+vals_kpi = [0, 0, 0, 0, 0]
 
-# 1. Payout to BM
-df_c1 = df_filtered.copy()
-if 'Status' in df_c1.columns and 'Invoice Amount' in df_c1.columns:
-    m_paid = df_c1['Status'].astype(str).str.upper().str.strip() == 'PAID'
-    val_payout_bm = df_c1[m_paid]['Invoice Amount'].sum()
-    ny_val = df_c1[~m_paid]['Invoice Amount'].sum()
-    with cols_kpi[0]:
-        create_compact_donut_card("Total Payout to BM", val_payout_bm, ny_val, key="kpi_1")
+# Hitung nilai KPI
+with df_filtered:
+    # 1. Payout to BM
+    df_c1 = df_filtered.copy()
+    if 'Status' in df_c1.columns and 'Invoice Amount' in df_c1.columns:
+        m_paid = df_c1['Status'].astype(str).str.upper().str.strip() == 'PAID'
+        val_payout_bm = df_c1[m_paid]['Invoice Amount'].sum()
+        ny_val = df_c1[~m_paid]['Invoice Amount'].sum()
+        with cols_kpi[0]:
+            create_compact_donut_card("Total Payout to BM", val_payout_bm, ny_val, key="kpi_1")
 
-# 2. Huawei To Agent
-df_c2 = df_filtered.copy()
-if 'Status' in df_c2.columns and 'NET AMOUNT' in df_c2.columns:
-    m_paid = df_c2['Status'].astype(str).str.upper().str.strip() == 'PAID'
-    val_huawei_agent = df_c2[m_paid]['NET AMOUNT'].sum()
-    ny_val = df_c2[~m_paid]['NET AMOUNT'].sum()
-    with cols_kpi[1]:
-        create_compact_donut_card("Huawei To Agent", val_huawei_agent, ny_val, key="kpi_2")
+    # 2. Huawei To Agent
+    df_c2 = df_filtered.copy()
+    if 'Status' in df_c2.columns and 'NET AMOUNT' in df_c2.columns:
+        m_paid = df_c2['Status'].astype(str).str.upper().str.strip() == 'PAID'
+        val_huawei_agent = df_c2[m_paid]['NET AMOUNT'].sum()
+        ny_val = df_c2[~m_paid]['NET AMOUNT'].sum()
+        with cols_kpi[1]:
+            create_compact_donut_card("Huawei To Agent", val_huawei_agent, ny_val, key="kpi_2")
 
-# 3. Agent To Telkomsel
-df_c3 = df_filtered.copy()
-if 'Invoice Agent' in df_c3.columns:
-    df_c3 = df_c3[df_c3['Invoice Agent'].astype(str).str.upper().str.strip() == 'INVOICE DONE']
-if 'Status' in df_c3.columns and 'NET AMOUNT' in df_c3.columns:
-    m_paid = df_c3['Status'].astype(str).str.upper().str.strip() == 'PAID'
-    val_agent_tsel = df_c3[m_paid]['NET AMOUNT'].sum()
-    ny_val = df_c3[~m_paid]['NET AMOUNT'].sum()
-    with cols_kpi[2]:
-        create_compact_donut_card("Agent To Telkomsel", val_agent_tsel, ny_val, key="kpi_3")
+    # 3. Agent To Telkomsel
+    df_c3 = df_filtered.copy()
+    if 'Invoice Agent' in df_c3.columns:
+        df_c3 = df_c3[df_c3['Invoice Agent'].astype(str).str.upper().str.strip() == 'INVOICE DONE']
+    if 'Status' in df_c3.columns and 'NET AMOUNT' in df_c3.columns:
+        m_paid = df_c3['Status'].astype(str).str.upper().str.strip() == 'PAID'
+        val_agent_tsel = df_c3[m_paid]['NET AMOUNT'].sum()
+        ny_val = df_c3[~m_paid]['NET AMOUNT'].sum()
+        with cols_kpi[2]:
+            create_compact_donut_card("Agent To Telkomsel", val_agent_tsel, ny_val, key="kpi_3")
 
-# 4. DN Issued
-df_c4 = df_filtered.copy()
-if 'Status Reimburse Actual' in df_c4.columns and 'NET AMOUNT' in df_c4.columns:
-    status_clean = df_c4['Status Reimburse Actual'].astype(str).str.upper().str.strip()
-    m_done = status_clean.isin(['PAID', 'DN ISSUED'])
-    val_dn_issued = df_c4[m_done]['NET AMOUNT'].sum()
-    ny_val = df_c4[~m_done]['NET AMOUNT'].sum()
-    with cols_kpi[3]:
-        create_compact_donut_card("DN Issued", val_dn_issued, ny_val, key="kpi_4")
+    # 4. DN Issued
+    df_c4 = df_filtered.copy()
+    if 'Status Reimburse Actual' in df_c4.columns and 'NET AMOUNT' in df_c4.columns:
+        status_clean = df_c4['Status Reimburse Actual'].astype(str).str.upper().str.strip()
+        m_done = status_clean.isin(['PAID', 'DN ISSUED'])
+        val_dn_issued = df_c4[m_done]['NET AMOUNT'].sum()
+        ny_val = df_c4[~m_done]['NET AMOUNT'].sum()
+        with cols_kpi[3]:
+            create_compact_donut_card("DN Issued", val_dn_issued, ny_val, key="kpi_4")
 
-# 5. Total Pay In To Huawei
-df_c5 = df_filtered.copy()
-if 'Status Reimburse Actual' in df_c5.columns and 'NET AMOUNT' in df_c5.columns:
-    status_clean = df_c5['Status Reimburse Actual'].astype(str).str.upper().str.strip()
-    m_paid = status_clean == 'PAID'
-    val_payin_huawei = df_c5[m_paid]['NET AMOUNT'].sum()
-    m_ny = status_clean.isin(['DN ISSUED', 'NY ISSUE DN'])
-    ny_val = df_c5[m_ny]['NET AMOUNT'].sum()
-    with cols_kpi[4]:
-        create_compact_donut_card("Total Pay In To Huawei", val_payin_huawei, ny_val, key="kpi_5")
+    # 5. Total Pay In To Huawei
+    df_c5 = df_filtered.copy()
+    if 'Status Reimburse Actual' in df_c5.columns and 'NET AMOUNT' in df_c5.columns:
+        status_clean = df_c5['Status Reimburse Actual'].astype(str).str.upper().str.strip()
+        m_paid = status_clean == 'PAID'
+        val_payin_huawei = df_c5[m_paid]['NET AMOUNT'].sum()
+        m_ny = status_clean.isin(['DN ISSUED', 'NY ISSUE DN'])
+        ny_val = df_c5[m_ny]['NET AMOUNT'].sum()
+        with cols_kpi[4]:
+            create_compact_donut_card("Total Pay In To Huawei", val_payin_huawei, ny_val, key="kpi_5")
 
 st.markdown("---")
 
@@ -603,8 +607,8 @@ if not df_summary_raw.empty:
     </body>
     </html>
     """
-    calc_height = min(750, max(200, (len(df_summary_raw) + 2) * 28))
-    components.html(full_html, height=calc_height, scrolling=True)
+    components.html(full_html, height=450, scrolling=True)
+
 # ==========================================
 # 10. REIMBURSEMENT SUMMARY TO TSEL & AGENT
 # ==========================================
@@ -853,7 +857,6 @@ if not df_risk_vat.empty:
     </body>
     </html>
     """
-
     components.html(full_html_vat, height=450, scrolling=True)
 
 # ==========================================
@@ -995,8 +998,8 @@ if not df_manfee.empty:
     </body>
     </html>
     """
-
     components.html(full_html_mf, height=450, scrolling=True)
+
 # ==========================================
 # 13. STATUS REJECTION SAP SUMMARY
 # ==========================================
