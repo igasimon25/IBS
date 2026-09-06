@@ -627,7 +627,7 @@ if not df_summary_raw.empty:
     </body>
     </html>
     """
-    components.html(full_html, height=550, scrolling=True)
+    components.html(full_html, height=650, scrolling=True)
 
 # ==========================================
 # 10. REIMBURSEMENT SUMMARY TO TSEL & AGENT
@@ -760,7 +760,7 @@ if not df_tsel_agent.empty:
     </body>
     </html>
     """
-    components.html(full_html_tsel, height=550, scrolling=True)
+    components.html(full_html_tsel, height=650, scrolling=True)
 
 def generate_risk_vat_summary(df):
     df_calc = df.copy()
@@ -934,7 +934,7 @@ if not df_risk_vat.empty:
     </style>
     </head>
     <body>
-    <div style="overflow-x: auto; max-height: 480px;">
+    <div style="overflow-x: auto; max-height: 550px;">
         <table>
             <thead>
                 <tr>
@@ -958,7 +958,7 @@ if not df_risk_vat.empty:
     </body>
     </html>
     """
-    components.html(full_html_vat, height=550, scrolling=True)
+    components.html(full_html_vat, height=650, scrolling=True)
 
 # ==========================================
 # 12. MANAGEMENT FEE PROCESS SUMMARY
@@ -1123,7 +1123,7 @@ if not df_manfee.empty:
     </body>
     </html>
     """
-    components.html(full_html_mf, height=480, scrolling=True)
+    components.html(full_html_mf, height=650, scrolling=True)
 
 # ==========================================
 # 13. STATUS REJECTION SAP SUMMARY (DROPDOWN MULTI-SELECT)
@@ -1270,7 +1270,7 @@ if not df_reject_summary.empty and col_reg_name:
     </style>
     </head>
     <body>
-    <div style="overflow-x: auto; max-height: 450px;">
+    <div style="overflow-x: auto; max-height: 550px;">
         <table>
             <thead>
                 <tr>
@@ -1288,7 +1288,7 @@ if not df_reject_summary.empty and col_reg_name:
     </body>
     </html>
     """
-    components.html(full_html_reject, height=400, scrolling=True)
+    components.html(full_html_reject, height=650, scrolling=True)
 else:
     st.info("Tidak ada data dengan Status SAP 'Rejected' yang sesuai dengan pilihan filter saat ini.")
 
@@ -1563,6 +1563,6 @@ if not df_trk_res.empty:
     </body>
     </html>
     """
-    components.html(full_trk_html, height=520, scrolling=False)
+    components.html(full_trk_html, height=650, scrolling=False)
 else:
     st.warning("Data Tracking Invoice tidak ditemukan berdasarkan filter yang dipilih.")
