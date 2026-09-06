@@ -723,7 +723,7 @@ if not df_tsel_agent.empty:
     </body>
     </html>
     """
-       calc_height = min(750, max(200, (len(df_summary_raw) + 2) * 28))
+       calc_height_tsel = min(750, max(200, (len(df_summary_raw) + 2) * 28))
     components.html(full_html_tsel, height=calc_height, scrolling=True)
 # ==========================================
 # 11. RISK VAT HUAWEI SUMMARY
