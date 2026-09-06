@@ -1254,7 +1254,7 @@ else:
 
 
 # ==========================================
-# STATUS TRACKING INVOICE BM (GITHUB READY)
+# STATUS TRACKING INVOICE BM (GITHUB READY - FINAL FIX)
 # ==========================================
 st.markdown("---")
 st.subheader("📊 Status Tracking Invoice BM")
@@ -1285,7 +1285,7 @@ if df_source is None or not isinstance(df_source, pd.DataFrame) or df_source.emp
     }
     df_source = pd.DataFrame(dummy_data)
 
-# Pembersihan awal nama kolom & duplikasi dataframe utama agar aman di Linux/GitHub Cloud
+# Pembersihan awal nama kolom & duplikasi dataframe utama
 df_source = df_source.loc[:, ~df_source.columns.duplicated()].copy()
 for col in df_source.columns:
     if isinstance(df_source[col], pd.DataFrame):
@@ -1303,15 +1303,15 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     opts_area = ["All"] + sorted(list(df_source[col_area].dropna().astype(str).unique())) if col_area else ["All"]
-    sel_area = st.selectbox("Select Area", opts_area, key="trk_area_github_v2")
+    sel_area = st.selectbox("Select Area", opts_area, key="trk_area_github_v3")
 
 with col2:
     opts_year = ["All"] + sorted(list(df_source[col_year].dropna().astype(str).unique())) if col_year else ["All"]
-    sel_year = st.selectbox("Select Year", opts_year, key="trk_year_github_v2")
+    sel_year = st.selectbox("Select Year", opts_year, key="trk_year_github_v3")
 
 with col3:
     opts_pic = ["All"] + sorted(list(df_source[col_pic].dropna().astype(str).unique())) if col_pic else ["All"]
-    sel_pic = st.selectbox("Select PIC Site", opts_pic, key="trk_pic_github_v2")
+    sel_pic = st.selectbox("Select PIC Site", opts_pic, key="trk_pic_github_v3")
 
 # Logika Filtering
 df_trk_filtered = df_source.copy()
@@ -1379,7 +1379,6 @@ def generate_tracking_invoice_table(df_input):
 
     index_cols = [col_reg_t, col_supp_t, col_site_t]
 
-    # Pivot Table dengan pengamanan duplikat kolom total
     pivot_df = df_trk.pivot_table(
         index=index_cols,
         columns='month_clean',
@@ -1395,8 +1394,10 @@ def generate_tracking_invoice_table(df_input):
 
     pivot_df = pivot_df[index_cols + months_order]
 
-    # Kalkulasi Formula Excel
-    pivot_df[months_order] = pivot_df[months_order].applymap(lambda x: 1 if x > 0 else 0)
+    # Menggunakan .map() agar kompatibel dengan Pandas versi terbaru di GitHub
+    for m in months_order:
+        pivot_df[m] = pivot_df[m].map(lambda x: 1 if x > 0 else 0)
+
     pivot_df['Grand Total'] = pivot_df[months_order].sum(axis=1)
     pivot_df['Progress'] = (pivot_df['Grand Total'] / 12.0 * 100).round(0)
     pivot_df['Invoice NY Received'] = pivot_df['Grand Total'].apply(lambda x: max(0, 12 - int(x)))
