@@ -588,3 +588,136 @@ if not df_summary_raw.empty:
     </html>
     """
     components.html(full_html, height=350, scrolling=True)
+
+# ==========================================
+# 10. REIMBURSEMENT SUMMARY TO TSEL & AGENT
+# ==========================================
+st.markdown("---")
+st.subheader("📊 Reimbursement Summary to TSEL & Agent")
+
+def generate_tsel_agent_summary(df):
+    df_calc = df.copy()
+    
+    # Deteksi Kolom Bulan
+    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
+    if col_m not in df_calc.columns or 'NET AMOUNT' not in df_calc.columns:
+        return pd.DataFrame(), col_m
+
+    # Standardisasi String Kolom
+    col_inv = 'Invoice Agent' if 'Invoice Agent' in df_calc.columns else 'Invoice Agent Status'
+    col_dn = 'Status Reimburse Actual' if 'Status Reimburse Actual' in df_calc.columns else ('DN HW' if 'DN HW' in df_calc.columns else 'Status Reimburse')
+
+    # Status Conditions
+    inv_series = df_calc[col_inv].astype(str).str.upper().str.strip() if col_inv in df_calc.columns else pd.Series('', index=df_calc.index)
+    dn_series = df_calc[col_dn].astype(str).str.upper().str.strip() if col_dn in df_calc.columns else pd.Series('', index=df_calc.index)
+
+    # Filtering Logic per Row
+    df_calc['INV_DONE'] = np.where(inv_series == 'INVOICE DONE', df_calc['NET AMOUNT'], 0)
+    df_calc['INV_NY'] = np.where(inv_series != 'INVOICE DONE', df_calc['NET AMOUNT'], 0)
+
+    df_calc['DN_DONE'] = np.where(dn_series.isin(['PAID', 'DN ISSUED']), df_calc['NET AMOUNT'], 0)
+    df_calc['DN_NY'] = np.where(~dn_series.isin(['PAID', 'DN ISSUED']), df_calc['NET AMOUNT'], 0)
+
+    # Groupby Month
+    summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
+        'NET AMOUNT': 'sum',
+        'INV_DONE': 'sum',
+        'INV_NY': 'sum',
+        'DN_DONE': 'sum',
+        'DN_NY': 'sum'
+    })
+
+    # Total Row
+    grand_total = pd.DataFrame([{
+        col_m: 'Grand Total',
+        'NET AMOUNT': summary['NET AMOUNT'].sum(),
+        'INV_DONE': summary['INV_DONE'].sum(),
+        'INV_NY': summary['INV_NY'].sum(),
+        'DN_DONE': summary['DN_DONE'].sum(),
+        'DN_NY': summary['DN_NY'].sum()
+    }])
+
+    full_summary = pd.concat([summary, grand_total], ignore_index=True)
+
+    # Formulas % Done
+    full_summary['PCT_TSEL'] = np.where(full_summary['NET AMOUNT'] > 0, (full_summary['INV_DONE'] / full_summary['NET AMOUNT']) * 100, 0.0)
+    full_summary['PCT_AGENT'] = np.where(full_summary['NET AMOUNT'] > 0, (full_summary['DN_DONE'] / full_summary['NET AMOUNT']) * 100, 0.0)
+
+    return full_summary, col_m
+
+df_tsel_agent, col_m_name = generate_tsel_agent_summary(df_filtered)
+
+if not df_tsel_agent.empty:
+    def fmt_rp_tsel(val):
+        if abs(val) < 1e-9:
+            return "Rp -"
+        elif val < 0:
+            return f"-Rp {abs(val):,.0f}".replace(",", ".")
+        else:
+            return f"Rp {val:,.0f}".replace(",", ".")
+
+    rows_html_tsel = ""
+    for idx, row in df_tsel_agent.iterrows():
+        val_m = row[col_m_name]
+        is_total = (val_m == 'Grand Total')
+        if pd.isna(val_m) or str(val_m).strip().lower() in ['nan', 'none', '']:
+            val_m = "(blank)"
+
+        row_style = "background-color: #f2f2f2; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #fafafa;")
+
+        rows_html_tsel += f"""
+        <tr style="{row_style}">
+            <td style="text-align: center; border: 1px solid #d9d9d9; padding: 5px;">{val_m}</td>
+            <td style="text-align: right; font-weight: bold; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['NET AMOUNT'])}</td>
+            
+            <!-- Reimbursement to TSEL -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['INV_DONE'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['INV_NY'])}</td>
+            <td style="text-align: center; font-weight: bold; background-color: #fce4d6; border: 1px solid #d9d9d9; padding: 5px;">{row['PCT_TSEL']:.2f}%</td>
+            
+            <!-- Reimbursement to Agent -->
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['DN_DONE'])}</td>
+            <td style="text-align: right; border: 1px solid #d9d9d9; padding: 5px;">{fmt_rp_tsel(row['DN_NY'])}</td>
+            <td style="text-align: center; font-weight: bold; background-color: #e2efda; border: 1px solid #d9d9d9; padding: 5px;">{row['PCT_AGENT']:.2f}%</td>
+        </tr>
+        """
+
+    full_html_tsel = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
+        th {{ border: 1px solid #b0b0b0; padding: 6px; text-align: center; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+    <div style="overflow-x: auto; max-height: 480px;">
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2" style="background-color: #d9d9d9; width: 10%;">Periode Month</th>
+                    <th rowspan="2" style="background-color: #d9d9d9; width: 13%;">NET AMOUNT</th>
+                    <th colspan="3" style="background-color: #f8c2a6; color: #000;">Reimbursement to TSEL</th>
+                    <th colspan="3" style="background-color: #a9d08e; color: #000;">Reimbursement to Agent</th>
+                </tr>
+                <tr>
+                    <th style="background-color: #fce4d6; width: 13%;">INV. DONE</th>
+                    <th style="background-color: #fce4d6; width: 13%;">INV. NY</th>
+                    <th style="background-color: #f8c2a6; width: 8%;">% Done</th>
+                    
+                    <th style="background-color: #e2efda; width: 13%;">DebitNote DONE</th>
+                    <th style="background-color: #e2efda; width: 13%;">DebitNote NY</th>
+                    <th style="background-color: #a9d08e; width: 8%;">% Done</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html_tsel}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    components.html(full_html_tsel, height=450, scrolling=True)
