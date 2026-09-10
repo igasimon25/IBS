@@ -543,7 +543,7 @@ def generate_reimbursement_summary_table(df):
         col_m: 'Grand Total',
         'NET AMOUNT': summary['NET AMOUNT'].sum(),
         'Amount SAP Filtered': summary['Amount SAP Filtered'].sum(),
-        'Amount Paid Based on Setoff Data': 'Amount Paid Based on Setoff Data',
+        'Amount Paid Based on Setoff Data': summary['Amount Paid Based on Setoff Data'].sum(),
         'Amount Paid': summary['Amount Paid'].sum(),
         'GAP': summary['GAP'].sum()
     }])
@@ -622,6 +622,7 @@ if not df_summary_raw.empty:
     """
     calc_height = min(750, max(200, (len(df_summary_raw) + 2) * 28))
     components.html(full_html, height=calc_height, scrolling=True)
+        
 # ==========================================
 # 10. REIMBURSEMENT SUMMARY TO TSEL & AGENT
 # ==========================================
