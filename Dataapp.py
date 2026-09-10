@@ -506,6 +506,9 @@ st.markdown("---")
 # ==========================================
 st.subheader("📊 Process Reimbursement Summary")
 
+# Tombol interaktif untuk menampilkan/menyembunyikan kolom Setoff Data
+show_setoff = st.checkbox("Tampilkan Kolom Amount Paid Based on Setoff Data & GAP", value=True)
+
 def generate_reimbursement_summary_table(df):
     df_calc = df.copy()
     num_cols = ['NET AMOUNT', 'Amount SAP', 'Amount Paid Based on Setoff Data', 'Amount Paid']
@@ -540,7 +543,7 @@ def generate_reimbursement_summary_table(df):
         col_m: 'Grand Total',
         'NET AMOUNT': summary['NET AMOUNT'].sum(),
         'Amount SAP Filtered': summary['Amount SAP Filtered'].sum(),
-        'Amount Paid Based on Setoff Data': summary['Amount Paid Based on Setoff Data'].sum(),
+        'Amount Paid Based on Setoff Data': 'Amount Paid Based on Setoff Data',
         'Amount Paid': summary['Amount Paid'].sum(),
         'GAP': summary['GAP'].sum()
     }])
@@ -567,16 +570,23 @@ if not df_summary_raw.empty:
 
         row_style = "background-color: #b4c6e7; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #f2f2f2;")
 
+        # Render sel berdasarkan kondisi checkbox show_setoff
+        setoff_td = f'<td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row["Amount Paid Based on Setoff Data"])}</td>' if show_setoff else ""
+        gap_td = f'<td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row["GAP"])}</td>' if show_setoff else ""
+
         rows_html += f"""
         <tr style="{row_style}">
             <td style="text-align: center; border: 1px solid #7f7f7f; padding: 5px;">{val_m}</td>
             <td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['NET AMOUNT'])}</td>
             <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['Amount SAP Filtered'])}</td>
-            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['Amount Paid Based on Setoff Data'])}</td>
+            {setoff_td}
             <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['Amount Paid'])}</td>
-            <td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['GAP'])}</td>
+            {gap_td}
         </tr>
         """
+
+    setoff_th = '<th style="background-color: #b4c6e7;">Amount Paid Setoff</th>' if show_setoff else ""
+    gap_th = '<th style="background-color: #b4c6e7;">GAP</th>' if show_setoff else ""
 
     full_html = f"""
     <!DOCTYPE html>
@@ -597,9 +607,9 @@ if not df_summary_raw.empty:
                     <th style="background-color: #d9e1f2; width: 12%;">Payment Month</th>
                     <th style="background-color: #b4c6e7;">NET AMOUNT</th>
                     <th style="background-color: #b4c6e7;">Amount SAP</th>
-                    <th style="background-color: #b4c6e7;">Amount Paid Setoff</th>
+                    {setoff_th}
                     <th style="background-color: #b4c6e7;">Amount Paid</th>
-                    <th style="background-color: #b4c6e7;">GAP</th>
+                    {gap_th}
                 </tr>
             </thead>
             <tbody>
