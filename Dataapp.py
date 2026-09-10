@@ -228,19 +228,20 @@ if 'Status Reimburse Actual' in df_c4.columns and 'NET AMOUNT' in df_c4.columns:
     with cols_kpi[3]:
         create_compact_donut_card("DN Issued", val_dn_issued, ny_val, key="kpi_4")
 
-# 5. Total Pay In To Huawei (Kunci basis dari Done DN Issued)
+# 5. Total Pay In To Huawei
 df_c5 = df_filtered.copy()
 if 'Status Reimburse Actual' in df_c5.columns and 'NET AMOUNT' in df_c5.columns:
     status_clean = df_c5['Status Reimburse Actual'].astype(str).str.upper().str.strip()
     
-    # Ambil baris yang statusnya PAID (untuk target 69.58)
-    m_paid = status_clean == 'PAID'
-    val_payin_huawei = df_c5[m_paid]['NET AMOUNT'].sum()
+    # Menggunakan logika filter yang sama persis dengan DN Issued
+    m_done = status_clean.isin(['PAID', 'DN ISSUED'])
     
-    # Jika Anda ingin bagian NY secara otomatis menjadi sisa dari target 88.57 M 
-    # (atau kita hitung selisihnya agar pas jadi 18.99 M dari total 88.57 M)
-    target_total_done = 88570000  # 88.57 M dalam angka numerik (sesuaikan jika ada koma desimal persis)
-    ny_val = 88570000 - val_payin_huawei if val_payin_huawei > 0 else 18990000
+    # Nilai Pay In (yang PAID)
+    m_paid = status_clean == 'PAID'
+    val_payin_huawei = df_c5[m_paid & m_done]['NET AMOUNT'].sum()
+    
+    # Nilai Not Yet (sisa dari total m_done)
+    ny_val = df_c5[m_done & ~m_paid]['NET AMOUNT'].sum()
     
     with cols_kpi[4]:
         create_compact_donut_card("Total Pay In To Huawei", val_payin_huawei, ny_val, key="kpi_5")
