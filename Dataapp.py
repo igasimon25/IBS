@@ -506,112 +506,122 @@ st.markdown("---")
 # ==========================================
 st.subheader("📊 Process Reimbursement Summary")
 
+# Tombol interaktif untuk menampilkan/menyembunyikan kolom Setoff Data
+show_setoff = st.checkbox("Tampilkan Kolom Amount Paid Based on Setoff Data & GAP", value=True)
+
 def generate_reimbursement_summary_table(df):
-    df_calc = df.copy()
-    num_cols = ['NET AMOUNT', 'Amount SAP', 'Amount Paid Based on Setoff Data', 'Amount Paid']
-    for col in num_cols:
-        if col == 'Amount Paid' and col not in df_calc.columns and 'Amount Actual Paid' in df_calc.columns:
-            df_calc['Amount Paid'] = df_calc['Amount Actual Paid']
-        elif col not in df_calc.columns:
-            df_calc[col] = 0
+    df_calc = df.copy()
+    num_cols = ['NET AMOUNT', 'Amount SAP', 'Amount Paid Based on Setoff Data', 'Amount Paid']
+    for col in num_cols:
+        if col == 'Amount Paid' and col not in df_calc.columns and 'Amount Actual Paid' in df_calc.columns:
+            df_calc['Amount Paid'] = df_calc['Amount Actual Paid']
+        elif col not in df_calc.columns:
+            df_calc[col] = 0
 
-    col_status_sap = 'StatusSAP' if 'StatusSAP' in df_calc.columns else 'Status SAP'
-    if col_status_sap in df_calc.columns:
-        sap_status_clean = df_calc[col_status_sap].astype(str).str.upper().str.strip()
-        mask_sap_cleared = sap_status_clean.isin(['CLEARED', 'PAID', 'CLEARED/PAID'])
-        df_calc['Amount SAP Filtered'] = np.where(mask_sap_cleared, df_calc['Amount SAP'], 0)
-    else:
-        df_calc['Amount SAP Filtered'] = df_calc['Amount SAP']
+    col_status_sap = 'StatusSAP' if 'StatusSAP' in df_calc.columns else 'Status SAP'
+    if col_status_sap in df_calc.columns:
+        sap_status_clean = df_calc[col_status_sap].astype(str).str.upper().str.strip()
+        mask_sap_cleared = sap_status_clean.isin(['CLEARED', 'PAID', 'CLEARED/PAID'])
+        df_calc['Amount SAP Filtered'] = np.where(mask_sap_cleared, df_calc['Amount SAP'], 0)
+    else:
+        df_calc['Amount SAP Filtered'] = df_calc['Amount SAP']
 
-    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
-    if col_m not in df_calc.columns:
-        return pd.DataFrame(), col_m
+    col_m = 'Payment Month' if 'Payment Month' in df_calc.columns else ('Month' if 'Month' in df_calc.columns else 'Periode Month')
+    if col_m not in df_calc.columns:
+        return pd.DataFrame(), col_m
 
-    summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
-        'NET AMOUNT': 'sum',
-        'Amount SAP Filtered': 'sum',
-        'Amount Paid Based on Setoff Data': 'sum',
-        'Amount Paid': 'sum'
-    })
+    summary = df_calc.groupby(col_m, as_index=False, dropna=False).agg({
+        'NET AMOUNT': 'sum',
+        'Amount SAP Filtered': 'sum',
+        'Amount Paid Based on Setoff Data': 'sum',
+        'Amount Paid': 'sum'
+    })
 
-    summary['GAP'] = summary['NET AMOUNT'] - summary['Amount Paid Based on Setoff Data']
+    summary['GAP'] = summary['NET AMOUNT'] - summary['Amount Paid Based on Setoff Data']
 
-    grand_total = pd.DataFrame([{
-        col_m: 'Grand Total',
-        'NET AMOUNT': summary['NET AMOUNT'].sum(),
-        'Amount SAP Filtered': summary['Amount SAP Filtered'].sum(),
-        'Amount Paid Based on Setoff Data': summary['Amount Paid Based on Setoff Data'].sum(),
-        'Amount Paid': summary['Amount Paid'].sum(),
-        'GAP': summary['GAP'].sum()
-    }])
+    grand_total = pd.DataFrame([{
+        col_m: 'Grand Total',
+        'NET AMOUNT': summary['NET AMOUNT'].sum(),
+        'Amount SAP Filtered': summary['Amount SAP Filtered'].sum(),
+        'Amount Paid Based on Setoff Data': 'Amount Paid Based on Setoff Data',
+        'Amount Paid': summary['Amount Paid'].sum(),
+        'GAP': summary['GAP'].sum()
+    }])
 
-    return pd.concat([summary, grand_total], ignore_index=True), col_m
+    return pd.concat([summary, grand_total], ignore_index=True), col_m
 
 df_summary_raw, col_month_name = generate_reimbursement_summary_table(df_filtered)
 
 if not df_summary_raw.empty:
-    def fmt_rp(val):
-        if abs(val) < 1e-9:
-            return "Rp -"
-        elif val < 0:
-            return f"-Rp {abs(val):,.0f}".replace(",", ".")
-        else:
-            return f"Rp {val:,.0f}".replace(",", ".")
+    def fmt_rp(val):
+        if abs(val) < 1e-9:
+            return "Rp -"
+        elif val < 0:
+            return f"-Rp {abs(val):,.0f}".replace(",", ".")
+        else:
+            return f"Rp {val:,.0f}".replace(",", ".")
 
-    rows_html = ""
-    for idx, row in df_summary_raw.iterrows():
-        val_m = row[col_month_name]
-        is_total = (val_m == 'Grand Total')
-        if pd.isna(val_m) or str(val_m).strip().lower() in ['nan', 'none', '']:
-            val_m = "(blank)"
+    rows_html = ""
+    for idx, row in df_summary_raw.iterrows():
+        val_m = row[col_month_name]
+        is_total = (val_m == 'Grand Total')
+        if pd.isna(val_m) or str(val_m).strip().lower() in ['nan', 'none', '']:
+            val_m = "(blank)"
 
-        row_style = "background-color: #b4c6e7; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #f2f2f2;")
+        row_style = "background-color: #b4c6e7; font-weight: bold;" if is_total else ("background-color: #ffffff;" if idx % 2 == 0 else "background-color: #f2f2f2;")
 
-        rows_html += f"""
-        <tr style="{row_style}">
-            <td style="text-align: center; border: 1px solid #7f7f7f; padding: 5px;">{val_m}</td>
-            <td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['NET AMOUNT'])}</td>
-            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['Amount SAP Filtered'])}</td>
-            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['Amount Paid Based on Setoff Data'])}</td>
-            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['Amount Paid'])}</td>
-            <td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['GAP'])}</td>
-        </tr>
-        """
+        # Render sel berdasarkan kondisi checkbox show_setoff
+        setoff_td = f'<td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row["Amount Paid Based on Setoff Data"])}</td>' if show_setoff else ""
+        gap_td = f'<td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row["GAP"])}</td>' if show_setoff else ""
 
-    full_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
-        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
-        th {{ border: 1px solid #7f7f7f; padding: 6px; text-align: center; font-weight: bold; }}
-    </style>
-    </head>
-    <body>
-    <div style="overflow-x: auto;">
-        <table>
-            <thead>
-                <tr>
-                    <th style="background-color: #d9e1f2; width: 12%;">Payment Month</th>
-                    <th style="background-color: #b4c6e7;">NET AMOUNT</th>
-                    <th style="background-color: #b4c6e7;">Amount SAP</th>
-                    <th style="background-color: #b4c6e7;">Amount Paid Setoff</th>
-                    <th style="background-color: #b4c6e7;">Amount Paid</th>
-                    <th style="background-color: #b4c6e7;">GAP</th>
-                </tr>
-            </thead>
-            <tbody>
-                {rows_html}
-            </tbody>
-        </table>
-    </div>
-    </body>
-    </html>
-    """
-    calc_height = min(750, max(200, (len(df_summary_raw) + 2) * 28))
-    components.html(full_html, height=calc_height, scrolling=True)
+        rows_html += f"""
+        <tr style="{row_style}">
+            <td style="text-align: center; border: 1px solid #7f7f7f; padding: 5px;">{val_m}</td>
+            <td style="text-align: right; font-weight: bold; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['NET AMOUNT'])}</td>
+            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['Amount SAP Filtered'])}</td>
+            {setoff_td}
+            <td style="text-align: right; border: 1px solid #7f7f7f; padding: 5px;">{fmt_rp(row['Amount Paid'])}</td>
+            {gap_td}
+        </tr>
+        """
+
+    setoff_th = '<th style="background-color: #b4c6e7;">Amount Paid Setoff</th>' if show_setoff else ""
+    gap_th = '<th style="background-color: #b4c6e7;">GAP</th>' if show_setoff else ""
+
+    full_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 0; background-color: transparent; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 11px; color: #000; }}
+        th {{ border: 1px solid #7f7f7f; padding: 6px; text-align: center; font-weight: bold; }}
+    </style>
+    </head>
+    <body>
+    <div style="overflow-x: auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th style="background-color: #d9e1f2; width: 12%;">Payment Month</th>
+                    <th style="background-color: #b4c6e7;">NET AMOUNT</th>
+                    <th style="background-color: #b4c6e7;">Amount SAP</th>
+                    {setoff_th}
+                    <th style="background-color: #b4c6e7;">Amount Paid</th>
+                    {gap_th}
+                </tr>
+            </thead>
+            <tbody>
+                {rows_html}
+            </tbody>
+        </table>
+    </div>
+    </body>
+    </html>
+    """
+    calc_height = min(750, max(200, (len(df_summary_raw) + 2) * 28))
+    components.html(full_html, height=calc_height, scrolling=True)
 # ==========================================
 # 10. REIMBURSEMENT SUMMARY TO TSEL & AGENT
 # ==========================================
